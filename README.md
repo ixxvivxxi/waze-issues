@@ -71,6 +71,16 @@ cd android
 
 In the app: Settings → nick + API key (same as server `API_KEY`). Use split-screen with Waze.
 
+## WME userscript
+
+Install [`wme-waze-issues.user.js`](wme-waze-issues.user.js) in Tampermonkey (also mirrored in [wme-scripts](https://github.com/ixxvivxxi/wme-scripts)).
+
+1. Open WME → sidebar tab **Drive reports**
+2. Paste API key, leave API base `https://waze-issues.ster.by`
+3. Enable **Show pending reports** (zoom 14+)
+4. Speed limits draw as circular road signs (red ring + number); bumps as yellow diamonds
+5. Click a marker → **Done** / **Dismiss**
+
 ## GitHub Actions
 
 - [`build-server.yml`](.github/workflows/build-server.yml) — `docker build` only
