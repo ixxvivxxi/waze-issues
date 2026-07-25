@@ -35,7 +35,7 @@ npm run start:dev
 
 ## Manual deploy (first time / until GHA secrets exist)
 
-On the VPS as `ster` (SSH host `myvps-tunnel`):
+On the VPS as `ster` (SSH host `myvps`):
 
 1. Create DB on shared `main-postgres` (once):
 
@@ -84,7 +84,7 @@ Build / publish:
 chmod +x android/build-apk.sh
 ./android/build-apk.sh            # → android/.../apk/release/app-release.apk
                                   # and deploy/public/app.apk
-./android/build-apk.sh --publish  # also scp to VPS (SSH host myvps-tunnel)
+./android/build-apk.sh --publish  # also scp to VPS (SSH host myvps)
 ```
 
 `versionCode` in `android/app/build.gradle.kts` must increase on each published build, or Android will refuse the update.
