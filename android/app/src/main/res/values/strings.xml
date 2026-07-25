@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Waze Issues</string>
+    <string name="notification_channel">Location tracking</string>
+    <string name="notification_title">Recording map report trail</string>
+    <string name="notification_text">GPS active for direction</string>
+</resources>
