@@ -8,9 +8,8 @@ Phone → server → database tool for flagging Waze map problems while driving 
 | Android | [`android/`](android/) | Split-screen one-tap reporter |
 | Deploy | [`deploy/`](deploy/) | Docker Compose on VPS + nginx snippets |
 
-**Production API (until host nginx TLS is installed):** `http://waze-issues.ster.by:8095`  
-**After** `deploy/install-nginx.sh` (needs sudo): `https://waze-issues.ster.by`  
-**APK:** `http://waze-issues.ster.by:8096/app.apk` (or `/app.apk` on HTTPS once nginx is wired)
+**Production:** `https://waze-issues.ster.by` (Let's Encrypt)  
+**APK:** `https://waze-issues.ster.by/app.apk`
 
 ## API (requires `X-Api-Key`)
 
@@ -51,18 +50,16 @@ docker exec -e PGPASSWORD=… main-postgres \
 
 3. `cd ~/waze-issues/deploy && chmod +x deploy.sh && ./deploy.sh`
 
-4. Host nginx TLS (needs your sudo password on the VPS — agent cannot sudo non-interactively):
+4. Host nginx + Let's Encrypt for `waze-issues.ster.by` (proxy to local `8095`/`8096`):
 
 ```bash
-ssh myvps-tunnel
+# writes /etc/nginx/sites-available/waze-issues and runs certbot --nginx
 ~/waze-issues/deploy/install-nginx.sh
 ```
 
-Until that runs, use the API on port **8095** and APK on **8096**.
+5. Copy APK to `deploy/public/app.apk`.
 
-5. Copy APK to `deploy/public/app.apk` (volume for static nginx on port 8096).
-
-API listens on `127.0.0.1:8095`, static on `8096`.
+Compose binds API/static on **127.0.0.1 only**; public access is via nginx on 443.
 
 ## Android
 

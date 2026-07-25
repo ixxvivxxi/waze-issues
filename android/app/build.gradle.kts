@@ -14,7 +14,7 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
-        buildConfigField("String", "DEFAULT_API_BASE", "\"http://waze-issues.ster.by:8095\"")
+        buildConfigField("String", "DEFAULT_API_BASE", "\"https://waze-issues.ster.by\"")
     }
 
     buildTypes {

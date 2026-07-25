@@ -17,7 +17,7 @@
         android:resizeableActivity="true"
         android:supportsRtl="true"
         android:theme="@style/Theme.WazeIssues"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="false">
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
