@@ -10,7 +10,8 @@ import {
 export type IssueType =
   | 'speed_bump_add'
   | 'speed_bump_remove'
-  | 'speed_limit';
+  | 'speed_limit'
+  | 'general';
 
 export type ReportStatus = 'pending' | 'done' | 'dismissed';
 

@@ -137,13 +137,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun reportBump(add: Boolean) {
         sendReport(
             issueType = if (add) "speed_bump_add" else "speed_bump_remove",
-            label = if (add) "Лежачий +" else "Лежачий −",
+            label = if (add) "Bump +" else "Bump −",
             valueKmh = null,
         )
     }
 
     fun reportSpeed(kmh: Int) {
-        sendReport(issueType = "speed_limit", label = "$kmh км/ч", valueKmh = kmh)
+        sendReport(issueType = "speed_limit", label = "$kmh km/h", valueKmh = kmh)
+    }
+
+    fun reportGeneral() {
+        sendReport(issueType = "general", label = "General issue", valueKmh = null)
     }
 
     private fun sendReport(issueType: String, label: String, valueKmh: Int?) {

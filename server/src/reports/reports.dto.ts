@@ -19,6 +19,7 @@ const ISSUE_TYPES: IssueType[] = [
   'speed_bump_add',
   'speed_bump_remove',
   'speed_limit',
+  'general',
 ];
 
 const SPEED_VALUES = [40, 60, 70, 90, 100, 110, 120];

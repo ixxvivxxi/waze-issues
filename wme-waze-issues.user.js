@@ -3,7 +3,7 @@
 // @description     Show driving map reports from waze-issues.ster.by: speed-limit road signs and speed-bump markers; Done / Dismiss.
 // @namespace       https://github.com/ixxvivxxi/wme-scripts
 // @homepageURL     https://github.com/ixxvivxxi/waze-issues
-// @version         2026.07.25.001
+// @version         2026.07.25.002
 // @match           https://www.waze.com/*/editor*
 // @match           https://www.waze.com/editor*
 // @match           https://beta.waze.com/*/editor*
@@ -247,13 +247,43 @@
     return iconCache[key];
   }
 
+  /** Generic map issue: orange circle with exclamation. */
+  function generalIssueDataUrl() {
+    const key = 'general';
+    if (iconCache[key]) return iconCache[key];
+    const s = ICON_PX;
+    const c = document.createElement('canvas');
+    c.width = s;
+    c.height = s;
+    const ctx = c.getContext('2d');
+    const cx = s / 2;
+    const cy = s / 2;
+    const r = s / 2 - 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffc107';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#212121';
+    ctx.stroke();
+    ctx.fillStyle = '#212121';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold ' + s * 0.55 + 'px Arial, Helvetica, sans-serif';
+    ctx.fillText('!', cx, cy + 1);
+    iconCache[key] = c.toDataURL('image/png');
+    return iconCache[key];
+  }
+
   function iconForReport(r) {
     if (r.issueType === 'speed_limit') {
       const kmh = r.payload && r.payload.valueKmh != null ? Number(r.payload.valueKmh) : NaN;
       return speedLimitSignDataUrl(Number.isFinite(kmh) ? kmh : '?');
     }
+    if (r.issueType === 'general') return generalIssueDataUrl();
     if (r.issueType === 'speed_bump_remove') return bumpSignDataUrl(true);
-    return bumpSignDataUrl(false);
+    if (r.issueType === 'speed_bump_add') return bumpSignDataUrl(false);
+    return generalIssueDataUrl();
   }
 
   function labelForReport(r) {
@@ -261,8 +291,10 @@
       const kmh = r.payload && r.payload.valueKmh != null ? r.payload.valueKmh : '?';
       return String(kmh) + ' km/h';
     }
+    if (r.issueType === 'general') return 'General issue';
     if (r.issueType === 'speed_bump_remove') return 'Bump removed';
-    return 'Bump added';
+    if (r.issueType === 'speed_bump_add') return 'Bump added';
+    return r.issueType || 'Issue';
   }
 
   function packBBox(minLon, minLat, maxLon, maxLat) {

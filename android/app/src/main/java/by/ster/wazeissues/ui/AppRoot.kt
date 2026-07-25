@@ -109,6 +109,13 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
             )
         }
 
+        Spacer(Modifier.height(10.dp))
+        GeneralIssueButton(
+            enabled = !state.busy,
+            onClick = { vm.reportGeneral() },
+            modifier = Modifier.fillMaxWidth(),
+        )
+
         Spacer(Modifier.height(12.dp))
         Text(
             "Speed limit",
@@ -154,6 +161,60 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GeneralIssueButton(
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val bg = Color(0xFF37474F)
+    Box(
+        modifier =
+            modifier
+                .height(72.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(if (enabled) bg else bg.copy(alpha = 0.45f))
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFFFC107)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    "!",
+                    color = Color(0xFF212121),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    "General issue",
+                    color = Color.White,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    "Add details later in Recent",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 12.sp,
+                )
             }
         }
     }

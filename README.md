@@ -19,7 +19,7 @@ Phone → server → database tool for flagging Waze map problems while driving 
 - `GET /api/reports/bbox?minLon&minLat&maxLon&maxLat&status=pending`
 - `GET /` — health `{ ok, service: "waze-issues" }`
 
-Issue types: `speed_bump_add`, `speed_bump_remove`, `speed_limit` (valueKmh ∈ 40,60,70,90,100,110,120).
+Issue types: `speed_bump_add`, `speed_bump_remove`, `speed_limit` (valueKmh ∈ 40,60,70,90,100,110,120), `general`.
 
 Shared Postgres on the VPS has **no PostGIS**; coordinates are `lon`/`lat` doubles and `trajectory` JSONB.
 
