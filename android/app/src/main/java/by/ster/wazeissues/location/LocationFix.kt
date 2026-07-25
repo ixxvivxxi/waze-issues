@@ -2,6 +2,7 @@ package by.ster.wazeissues.location
 
 import android.annotation.SuppressLint
 import android.content.Context
+import by.ster.wazeissues.R
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -17,7 +18,7 @@ object LocationFix {
         val loc =
             fused.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token).await()
                 ?: fused.lastLocation.await()
-                ?: error("No GPS fix yet — wait a moment and try again")
+                ?: error(context.getString(R.string.no_gps))
         return Fix(loc.longitude, loc.latitude)
     }
 }

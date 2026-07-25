@@ -9,6 +9,7 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import by.ster.wazeissues.R
 import by.ster.wazeissues.data.ApiClient
 import by.ster.wazeissues.data.LonLat
 import by.ster.wazeissues.data.ReportRemote
@@ -57,6 +58,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             apiKeyProvider = { _state.value.apiKey },
         )
 
+    private fun str(resId: Int): String = getApplication<Application>().getString(resId)
+
+    private fun str(resId: Int, vararg args: Any): String =
+        getApplication<Application>().getString(resId, *args)
+
     init {
         viewModelScope.launch {
             settings.nick.collect { nick -> _state.update { it.copy(nick = nick) } }
@@ -84,7 +90,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _state.update {
                 it.copy(
                     showSettings = false,
-                    statusMessage = "Settings saved",
+                    statusMessage = str(R.string.settings_saved),
                     nick = nick.trim(),
                     apiKey = apiKey.trim(),
                     apiBase = apiBase.trim().trimEnd('/'),
@@ -119,7 +125,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         busy = false,
                         editingId = null,
                         editingText = "",
-                        statusMessage = "Note saved",
+                        statusMessage = str(R.string.note_saved),
                         recent =
                             s.recent.map {
                                 if (it.id == id) it.copy(description = text) else it
@@ -128,7 +134,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
             } catch (e: Exception) {
                 _state.update {
-                    it.copy(busy = false, statusMessage = e.message ?: "Failed to save note")
+                    it.copy(
+                        busy = false,
+                        statusMessage = e.message ?: str(R.string.note_save_failed),
+                    )
                 }
             }
         }
@@ -137,30 +146,39 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun reportBump(add: Boolean) {
         sendReport(
             issueType = if (add) "speed_bump_add" else "speed_bump_remove",
-            label = if (add) "Bump +" else "Bump −",
+            label =
+                if (add) str(R.string.label_bump_add) else str(R.string.label_bump_remove),
             valueKmh = null,
         )
     }
 
     fun reportSpeed(kmh: Int) {
-        sendReport(issueType = "speed_limit", label = "$kmh km/h", valueKmh = kmh)
+        sendReport(
+            issueType = "speed_limit",
+            label = str(R.string.label_speed_kmh, kmh),
+            valueKmh = kmh,
+        )
     }
 
     fun reportGeneral() {
-        sendReport(issueType = "general", label = "General issue", valueKmh = null)
+        sendReport(
+            issueType = "general",
+            label = str(R.string.label_general),
+            valueKmh = null,
+        )
     }
 
     private fun sendReport(issueType: String, label: String, valueKmh: Int?) {
         val s = _state.value
         if (s.nick.isBlank()) {
             _state.update {
-                it.copy(statusMessage = "Set your nick in Settings first", showSettings = true)
+                it.copy(statusMessage = str(R.string.need_nick), showSettings = true)
             }
             return
         }
         if (s.apiKey.isBlank()) {
             _state.update {
-                it.copy(statusMessage = "Set API key in Settings first", showSettings = true)
+                it.copy(statusMessage = str(R.string.need_api_key), showSettings = true)
             }
             return
         }
@@ -180,11 +198,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         )
                     }
                 prependRecent(created, label)
-                _state.update { it.copy(busy = false, statusMessage = "Sent: $label") }
+                _state.update {
+                    it.copy(busy = false, statusMessage = str(R.string.sent, label))
+                }
                 startTrailService(created.id)
             } catch (e: Exception) {
                 _state.update {
-                    it.copy(busy = false, statusMessage = e.message ?: "Send failed")
+                    it.copy(busy = false, statusMessage = e.message ?: str(R.string.send_failed))
                 }
             }
         }
@@ -201,15 +221,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun uploadTrajectory(reportId: String, points: List<LonLat>) {
         if (points.size < 2) {
-            _state.update { it.copy(statusMessage = "Trail too short for heading") }
+            _state.update { it.copy(statusMessage = str(R.string.trail_too_short)) }
             return
         }
         try {
             val heading = bearing(points.first(), points.last())
             withContext(Dispatchers.IO) { api.patchTrajectory(reportId, points, heading) }
-            _state.update { it.copy(statusMessage = "Direction saved (${heading.toInt()}°)") }
+            _state.update {
+                it.copy(statusMessage = str(R.string.direction_saved, heading.toInt()))
+            }
         } catch (e: Exception) {
-            _state.update { it.copy(statusMessage = "Trail upload failed: ${e.message}") }
+            _state.update {
+                it.copy(statusMessage = str(R.string.trail_upload_failed, e.message ?: ""))
+            }
         }
     }
 

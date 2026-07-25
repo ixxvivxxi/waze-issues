@@ -4,4 +4,42 @@
     <string name="notification_channel">Location tracking</string>
     <string name="notification_title">Recording map report trail</string>
     <string name="notification_text">GPS active for direction</string>
+
+    <string name="settings">Settings</string>
+    <string name="save">Save</string>
+    <string name="back">Back</string>
+    <string name="cancel">Cancel</string>
+    <string name="recent">Recent</string>
+    <string name="speed_limit_section">Speed limit</string>
+    <string name="add_note">Add note</string>
+    <string name="description">Description</string>
+    <string name="nick_label">Nick (shown to editors)</string>
+    <string name="api_key_label">API key</string>
+    <string name="api_base_label">API base URL</string>
+    <string name="tap_to_add_note">Tap to add note</string>
+    <string name="status_idle">Tap to report · nick: %1$s</string>
+    <string name="nick_placeholder">—</string>
+
+    <string name="bump_add">Add</string>
+    <string name="bump_remove">Remove</string>
+    <string name="speed_bump">speed bump</string>
+    <string name="general_issue">General issue</string>
+    <string name="general_issue_hint">Add details later in Recent</string>
+
+    <string name="label_bump_add">Bump +</string>
+    <string name="label_bump_remove">Bump −</string>
+    <string name="label_speed_kmh">%1$d km/h</string>
+    <string name="label_general">General issue</string>
+
+    <string name="settings_saved">Settings saved</string>
+    <string name="note_saved">Note saved</string>
+    <string name="note_save_failed">Failed to save note</string>
+    <string name="need_nick">Set your nick in Settings first</string>
+    <string name="need_api_key">Set API key in Settings first</string>
+    <string name="sent">Sent: %1$s</string>
+    <string name="send_failed">Send failed</string>
+    <string name="trail_too_short">Trail too short for heading</string>
+    <string name="direction_saved">Direction saved (%1$d°)</string>
+    <string name="trail_upload_failed">Trail upload failed: %1$s</string>
+    <string name="no_gps">No GPS fix yet — wait a moment and try again</string>
 </resources>

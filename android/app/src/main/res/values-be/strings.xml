@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Waze Issues</string>
+    <string name="notification_channel">Сачэнне за месцазнаходжаннем</string>
+    <string name="notification_title">Запіс траекторыі справаздачы</string>
+    <string name="notification_text">GPS актыўны для напрамку</string>
+
+    <string name="settings">Налады</string>
+    <string name="save">Захаваць</string>
+    <string name="back">Назад</string>
+    <string name="cancel">Скасаваць</string>
+    <string name="recent">Нядаўнія</string>
+    <string name="speed_limit_section">Абмежаванне хуткасці</string>
+    <string name="add_note">Дадаць нататку</string>
+    <string name="description">Апісанне</string>
+    <string name="nick_label">Нік (бачны рэдактарам)</string>
+    <string name="api_key_label">API-ключ</string>
+    <string name="api_base_label">Базавы URL API</string>
+    <string name="tap_to_add_note">Націсніце, каб дадаць нататку</string>
+    <string name="status_idle">Націсніце, каб адзначыць · нік: %1$s</string>
+    <string name="nick_placeholder">—</string>
+
+    <string name="bump_add">Дадаць</string>
+    <string name="bump_remove">Прыбраць</string>
+    <string name="speed_bump">ляжачы паліцэйскі</string>
+    <string name="general_issue">Агульная праблема</string>
+    <string name="general_issue_hint">Падрабязнасці пазней у «Нядаўнія»</string>
+
+    <string name="label_bump_add">Ляжачы +</string>
+    <string name="label_bump_remove">Ляжачы −</string>
+    <string name="label_speed_kmh">%1$d км/г</string>
+    <string name="label_general">Агульная праблема</string>
+
+    <string name="settings_saved">Налады захаваны</string>
+    <string name="note_saved">Нататка захавана</string>
+    <string name="note_save_failed">Не ўдалося захаваць нататку</string>
+    <string name="need_nick">Спачатку пазначце нік у Наладах</string>
+    <string name="need_api_key">Спачатку пазначце API-ключ у Наладах</string>
+    <string name="sent">Адпраўлена: %1$s</string>
+    <string name="send_failed">Памылка адпраўкі</string>
+    <string name="trail_too_short">Траекторыя занадта кароткая для напрамку</string>
+    <string name="direction_saved">Напрамак захаваны (%1$d°)</string>
+    <string name="trail_upload_failed">Не ўдалося адправіць траекторыю: %1$s</string>
+    <string name="no_gps">Няма GPS — пачакайце трохі і паспрабуйце зноў</string>
+</resources>

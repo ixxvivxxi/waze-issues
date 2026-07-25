@@ -38,12 +38,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import by.ster.wazeissues.R
 
 private val SpeedSignRed = Color(0xFFE30613)
 private val SpeedSignBg = Color(0xFFFFFFF8)
@@ -67,6 +69,8 @@ fun AppRoot(vm: MainViewModel = viewModel()) {
 
 @Composable
 private fun MainScreen(state: UiState, vm: MainViewModel) {
+    val nickShown =
+        state.nick.ifBlank { stringResource(R.string.nick_placeholder) }
     Column(
         Modifier
             .fillMaxSize()
@@ -78,15 +82,17 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "Waze Issues",
+                stringResource(R.string.app_name),
                 style = MaterialTheme.typography.titleMedium,
             )
             TextButton(onClick = { vm.openSettings(true) }) {
-                Text("Settings")
+                Text(stringResource(R.string.settings))
             }
         }
         Text(
-            state.statusMessage.ifBlank { "Tap to report · nick: ${state.nick.ifBlank { "—" }}" },
+            state.statusMessage.ifBlank {
+                stringResource(R.string.status_idle, nickShown)
+            },
             fontSize = 12.sp,
             modifier = Modifier.padding(bottom = 8.dp),
         )
@@ -118,7 +124,7 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
 
         Spacer(Modifier.height(12.dp))
         Text(
-            "Speed limit",
+            stringResource(R.string.speed_limit_section),
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(bottom = 6.dp),
         )
@@ -145,7 +151,7 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
         }
 
         Spacer(Modifier.height(10.dp))
-        Text("Recent", style = MaterialTheme.typography.titleSmall)
+        Text(stringResource(R.string.recent), style = MaterialTheme.typography.titleSmall)
         LazyColumn(Modifier.weight(1f)) {
             items(state.recent, key = { it.id }) { item ->
                 Column(
@@ -156,7 +162,8 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
                 ) {
                     Text(item.label, style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        item.description?.takeIf { it.isNotBlank() } ?: "Tap to add note",
+                        item.description?.takeIf { it.isNotBlank() }
+                            ?: stringResource(R.string.tap_to_add_note),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -205,13 +212,13 @@ private fun GeneralIssueButton(
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(
-                    "General issue",
+                    stringResource(R.string.general_issue),
                     color = Color.White,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    "Add details later in Recent",
+                    stringResource(R.string.general_issue_hint),
                     color = Color.White.copy(alpha = 0.85f),
                     fontSize = 12.sp,
                 )
@@ -228,7 +235,7 @@ private fun BumpActionButton(
     modifier: Modifier = Modifier,
 ) {
     val bg = if (add) BumpAddBg else BumpRemoveBg
-    val label = if (add) "Add" else "Remove"
+    val label = if (add) stringResource(R.string.bump_add) else stringResource(R.string.bump_remove)
     Box(
         modifier =
             modifier
@@ -256,7 +263,7 @@ private fun BumpActionButton(
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
-                    "speed bump",
+                    stringResource(R.string.speed_bump),
                     color = Color.White.copy(alpha = 0.9f),
                     fontSize = 14.sp,
                 )
@@ -364,31 +371,35 @@ private fun SettingsScreen(state: UiState, vm: MainViewModel) {
     var apiKey by remember(state.apiKey) { mutableStateOf(state.apiKey) }
     var apiBase by remember(state.apiBase) { mutableStateOf(state.apiBase) }
     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Settings", style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.settings), style = MaterialTheme.typography.titleLarge)
         OutlinedTextField(
             value = nick,
             onValueChange = { nick = it },
-            label = { Text("Nick (shown to editors)") },
+            label = { Text(stringResource(R.string.nick_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = apiKey,
             onValueChange = { apiKey = it },
-            label = { Text("API key") },
+            label = { Text(stringResource(R.string.api_key_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
             value = apiBase,
             onValueChange = { apiBase = it },
-            label = { Text("API base URL") },
+            label = { Text(stringResource(R.string.api_base_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { vm.saveSettings(nick, apiKey, apiBase) }) { Text("Save") }
-            TextButton(onClick = { vm.openSettings(false) }) { Text("Back") }
+            Button(onClick = { vm.saveSettings(nick, apiKey, apiBase) }) {
+                Text(stringResource(R.string.save))
+            }
+            TextButton(onClick = { vm.openSettings(false) }) {
+                Text(stringResource(R.string.back))
+            }
         }
     }
 }
@@ -396,19 +407,23 @@ private fun SettingsScreen(state: UiState, vm: MainViewModel) {
 @Composable
 private fun EditNoteScreen(state: UiState, vm: MainViewModel) {
     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Add note", style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.add_note), style = MaterialTheme.typography.titleLarge)
         OutlinedTextField(
             value = state.editingText,
             onValueChange = vm::setEditingText,
-            label = { Text("Description") },
+            label = { Text(stringResource(R.string.description)) },
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .height(140.dp),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = vm::saveDescription, enabled = !state.busy) { Text("Save") }
-            TextButton(onClick = vm::closeEdit) { Text("Cancel") }
+            Button(onClick = vm::saveDescription, enabled = !state.busy) {
+                Text(stringResource(R.string.save))
+            }
+            TextButton(onClick = vm::closeEdit) {
+                Text(stringResource(R.string.cancel))
+            }
         }
     }
 }

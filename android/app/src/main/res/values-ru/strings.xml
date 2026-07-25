@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Waze Issues</string>
+    <string name="notification_channel">Отслеживание местоположения</string>
+    <string name="notification_title">Запись траектории отчёта</string>
+    <string name="notification_text">GPS активен для направления</string>
+
+    <string name="settings">Настройки</string>
+    <string name="save">Сохранить</string>
+    <string name="back">Назад</string>
+    <string name="cancel">Отмена</string>
+    <string name="recent">Недавние</string>
+    <string name="speed_limit_section">Ограничение скорости</string>
+    <string name="add_note">Добавить заметку</string>
+    <string name="description">Описание</string>
+    <string name="nick_label">Ник (виден редакторам)</string>
+    <string name="api_key_label">API-ключ</string>
+    <string name="api_base_label">Базовый URL API</string>
+    <string name="tap_to_add_note">Нажмите, чтобы добавить заметку</string>
+    <string name="status_idle">Нажмите, чтобы отметить · ник: %1$s</string>
+    <string name="nick_placeholder">—</string>
+
+    <string name="bump_add">Добавить</string>
+    <string name="bump_remove">Убрать</string>
+    <string name="speed_bump">лежачий полицейский</string>
+    <string name="general_issue">Общая проблема</string>
+    <string name="general_issue_hint">Подробности позже в «Недавние»</string>
+
+    <string name="label_bump_add">Лежачий +</string>
+    <string name="label_bump_remove">Лежачий −</string>
+    <string name="label_speed_kmh">%1$d км/ч</string>
+    <string name="label_general">Общая проблема</string>
+
+    <string name="settings_saved">Настройки сохранены</string>
+    <string name="note_saved">Заметка сохранена</string>
+    <string name="note_save_failed">Не удалось сохранить заметку</string>
+    <string name="need_nick">Сначала укажите ник в Настройках</string>
+    <string name="need_api_key">Сначала укажите API-ключ в Настройках</string>
+    <string name="sent">Отправлено: %1$s</string>
+    <string name="send_failed">Ошибка отправки</string>
+    <string name="trail_too_short">Траектория слишком короткая для направления</string>
+    <string name="direction_saved">Направление сохранено (%1$d°)</string>
+    <string name="trail_upload_failed">Не удалось отправить траекторию: %1$s</string>
+    <string name="no_gps">Нет GPS — подождите немного и попробуйте снова</string>
+</resources>
