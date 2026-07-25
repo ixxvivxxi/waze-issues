@@ -81,7 +81,7 @@ cp -f "$OUT_APK" "$ROOT/deploy/public/app.apk"
 echo "==> Copied to deploy/public/app.apk ($(wc -c < "$ROOT/deploy/public/app.apk") bytes)"
 
 if [[ "$PUBLISH" -eq 1 ]]; then
-  SSH_HOST="${WAZE_ISSUES_SSH:-myvps-tunnel}"
+  SSH_HOST="${WAZE_ISSUES_SSH:-myvps}"
   echo "==> Publishing to VPS ($SSH_HOST:~/waze-issues/deploy/public/app.apk)"
   scp "$ROOT/deploy/public/app.apk" "${SSH_HOST}:~/waze-issues/deploy/public/app.apk"
   echo "==> Live at https://waze-issues.ster.by/app.apk"

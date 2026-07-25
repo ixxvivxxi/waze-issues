@@ -100,7 +100,7 @@ chmod +x android/build-apk.sh
 | Docker image | `eclipse-temurin:17-jdk` |
 | Gradle | `android/gradlew assembleRelease` (signed) |
 | Signing | `android/signing/` (gitignored keystore — back it up) |
-| Publish SSH | host `myvps-tunnel` → user `ster`, key `~/.ssh/id_ed25519_autossh` |
+| Publish SSH | host `myvps` → user `ster` |
 | Live APK URL | `https://waze-issues.ster.by/app.apk` |
 | CI | `.github/workflows/build-android.yml` — release if keystore secrets set, else debug |
 
