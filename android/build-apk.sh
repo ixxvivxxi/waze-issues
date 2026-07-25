@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Build debug APK using Docker (no local Android Studio / SDK required after first SDK cache).
+# Usage (from repo root):
+#   ./android/build-apk.sh
+#   ./android/build-apk.sh --publish   # also scp to VPS as app.apk
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ANDROID_DIR="$ROOT/android"
+SDK_CACHE="${ANDROID_SDK_CACHE:-$HOME/.android-sdk-docker}"
+OUT_APK="$ANDROID_DIR/app/build/outputs/apk/debug/app-debug.apk"
+PUBLISH=0
+
+for arg in "$@"; do
+  case "$arg" in
+    --publish) PUBLISH=1 ;;
+    -h|--help)
+      echo "Usage: $0 [--publish]"
+      exit 0
+      ;;
+  esac
+done
+
+mkdir -p "$SDK_CACHE"
+
+echo "==> Building debug APK (Docker + cached SDK at $SDK_CACHE)"
+docker run --rm \
+  -v "$ANDROID_DIR:/project" \
+  -v "$SDK_CACHE:/opt/android-sdk" \
+  -w /project \
+  eclipse-temurin:17-jdk \
+  bash -lc '
+set -e
+export ANDROID_HOME=/opt/android-sdk
+export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools"
+
+if [[ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]]; then
+  echo "Downloading Android cmdline-tools…"
+  apt-get update -qq
+  apt-get install -y -qq wget unzip >/dev/null
+  mkdir -p "$ANDROID_HOME/cmdline-tools"
+  cd /tmp
+  wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdtools.zip
+  unzip -q cmdtools.zip -d "$ANDROID_HOME/cmdline-tools"
+  mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+fi
+
+yes | sdkmanager --licenses >/tmp/sdk-lic.txt 2>/dev/null || true
+sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+
+cd /project
+chmod +x ./gradlew
+./gradlew assembleDebug --no-daemon
+ls -la app/build/outputs/apk/debug/
+'
+
+if [[ ! -f "$OUT_APK" ]]; then
+  echo "ERROR: APK not found at $OUT_APK" >&2
+  exit 1
+fi
+
+mkdir -p "$ROOT/deploy/public"
+cp -f "$OUT_APK" "$ROOT/deploy/public/app.apk"
+echo "==> Copied to deploy/public/app.apk ($(wc -c < "$ROOT/deploy/public/app.apk") bytes)"
+
+if [[ "$PUBLISH" -eq 1 ]]; then
+  SSH_HOST="${WAZE_ISSUES_SSH:-myvps-tunnel}"
+  echo "==> Publishing to VPS ($SSH_HOST:~/waze-issues/deploy/public/app.apk)"
+  scp "$ROOT/deploy/public/app.apk" "${SSH_HOST}:~/waze-issues/deploy/public/app.apk"
+  echo "==> Live at https://waze-issues.ster.by/app.apk"
+fi
+
+echo "BUILD_OK: $OUT_APK"

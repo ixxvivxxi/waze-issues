@@ -63,13 +63,72 @@ Compose binds API/static on **127.0.0.1 only**; public access is via nginx on 44
 
 ## Android
 
+Default API base in the APK is `https://waze-issues.ster.by` (see `android/app/build.gradle.kts` → `DEFAULT_API_BASE`).
+
+In the app: **Settings** → nick + API key (same as server `API_KEY` in `deploy/.env.prod`). Use split-screen with Waze.
+
+### Build APK (Docker — recommended on this machine)
+
+There is usually **no** local Android Studio / `ANDROID_HOME`. Build with JDK Docker image + a cached SDK directory.
+
+**One-liner script** (from repo root `/home/anton/projects/waze-issues`):
+
 ```bash
-cd android
-./gradlew assembleDebug
-# APK: app/build/outputs/apk/debug/app-debug.apk
+chmod +x android/build-apk.sh
+./android/build-apk.sh            # writes android/app/build/outputs/apk/debug/app-debug.apk
+                                  # and copies to deploy/public/app.apk
+./android/build-apk.sh --publish  # also scp to VPS (SSH host myvps-tunnel / ster@95.128.71.94)
 ```
 
-In the app: Settings → nick + API key (same as server `API_KEY`). Use split-screen with Waze.
+**Manual equivalent:**
+
+```bash
+cd /home/anton/projects/waze-issues
+mkdir -p "$HOME/.android-sdk-docker"
+
+docker run --rm \
+  -v "$PWD/android:/project" \
+  -v "$HOME/.android-sdk-docker:/opt/android-sdk" \
+  -w /project \
+  eclipse-temurin:17-jdk \
+  bash -lc '
+    set -e
+    export ANDROID_HOME=/opt/android-sdk
+    export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+    if [ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]; then
+      apt-get update -qq && apt-get install -y -qq wget unzip >/dev/null
+      mkdir -p "$ANDROID_HOME/cmdline-tools"
+      cd /tmp
+      wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdtools.zip
+      unzip -q cmdtools.zip -d "$ANDROID_HOME/cmdline-tools"
+      mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+    fi
+    yes | sdkmanager --licenses >/dev/null || true
+    sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+    cd /project && ./gradlew assembleDebug --no-daemon
+  '
+
+# Output:
+#   android/app/build/outputs/apk/debug/app-debug.apk
+
+cp android/app/build/outputs/apk/debug/app-debug.apk deploy/public/app.apk
+scp deploy/public/app.apk myvps-tunnel:~/waze-issues/deploy/public/app.apk
+# Download: https://waze-issues.ster.by/app.apk
+```
+
+Notes for another agent/chat:
+
+| Item | Value |
+|------|-------|
+| Repo | `/home/anton/projects/waze-issues` (GitHub `ixxvivxxi/waze-issues`) |
+| SDK cache | `~/.android-sdk-docker` (reuse across builds; first run is slow) |
+| Docker image | `eclipse-temurin:17-jdk` |
+| Gradle | `android/gradlew assembleDebug` |
+| Publish SSH | host `myvps-tunnel` → user `ster`, key `~/.ssh/id_ed25519_autossh` |
+| Live APK URL | `https://waze-issues.ster.by/app.apk` |
+| CI | `.github/workflows/build-android.yml` builds APK artifact only (no auto-publish yet) |
+
+If you have a local SDK instead: `cd android && ./gradlew assembleDebug`.
 
 ## WME userscript
 
