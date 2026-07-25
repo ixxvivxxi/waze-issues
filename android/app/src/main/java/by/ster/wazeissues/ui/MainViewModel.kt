@@ -12,7 +12,6 @@ import androidx.lifecycle.viewModelScope
 import by.ster.wazeissues.R
 import by.ster.wazeissues.data.ApiClient
 import by.ster.wazeissues.data.LonLat
-import by.ster.wazeissues.data.ReportRemote
 import by.ster.wazeissues.data.SettingsStore
 import by.ster.wazeissues.location.LocationFix
 import by.ster.wazeissues.location.LocationTrailService
@@ -24,15 +23,24 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.util.UUID
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
+
+enum class SyncStatus {
+    Pending,
+    Synced,
+    Failed,
+}
 
 data class RecentItem(
     val id: String,
     val label: String,
     val description: String?,
     val createdAt: String,
+    val syncStatus: SyncStatus = SyncStatus.Synced,
 )
 
 data class UiState(
@@ -100,6 +108,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openEdit(item: RecentItem) {
+        if (item.syncStatus != SyncStatus.Synced) {
+            _state.update { it.copy(statusMessage = str(R.string.wait_until_synced)) }
+            return
+        }
         _state.update {
             it.copy(editingId = item.id, editingText = item.description.orEmpty())
         }
@@ -155,7 +167,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun reportSpeed(kmh: Int) {
         sendReport(
             issueType = "speed_limit",
-            label = str(R.string.label_speed_kmh, kmh),
+            label =
+                if (kmh == 0) {
+                    str(R.string.label_speed_end)
+                } else {
+                    str(R.string.label_speed_kmh, kmh)
+                },
             valueKmh = kmh,
         )
     }
@@ -182,11 +199,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
             return
         }
+
+        val localId = UUID.randomUUID().toString()
+        val createdAt = Instant.now().toString()
+        val pending =
+            RecentItem(
+                id = localId,
+                label = label,
+                description = null,
+                createdAt = createdAt,
+                syncStatus = SyncStatus.Pending,
+            )
+        _state.update {
+            it.copy(
+                recent = (listOf(pending) + it.recent).take(30),
+                statusMessage = str(R.string.queued, label),
+            )
+        }
+        vibrate()
+
         viewModelScope.launch {
-            _state.update { it.copy(busy = true) }
             try {
                 val fix = LocationFix.current(getApplication())
-                vibrate()
                 val created =
                     withContext(Dispatchers.IO) {
                         api.createReport(
@@ -195,16 +229,41 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             lat = fix.lat,
                             reporterNick = s.nick,
                             valueKmh = valueKmh,
+                            clientEventId = localId,
                         )
                     }
-                prependRecent(created, label)
-                _state.update {
-                    it.copy(busy = false, statusMessage = str(R.string.sent, label))
+                _state.update { st ->
+                    st.copy(
+                        statusMessage = str(R.string.sent, label),
+                        recent =
+                            st.recent.map { item ->
+                                if (item.id == localId) {
+                                    item.copy(
+                                        id = created.id,
+                                        description = created.description,
+                                        createdAt = created.createdAt,
+                                        syncStatus = SyncStatus.Synced,
+                                    )
+                                } else {
+                                    item
+                                }
+                            },
+                    )
                 }
                 startTrailService(created.id)
             } catch (e: Exception) {
-                _state.update {
-                    it.copy(busy = false, statusMessage = e.message ?: str(R.string.send_failed))
+                _state.update { st ->
+                    st.copy(
+                        statusMessage = e.message ?: str(R.string.send_failed),
+                        recent =
+                            st.recent.map { item ->
+                                if (item.id == localId) {
+                                    item.copy(syncStatus = SyncStatus.Failed)
+                                } else {
+                                    item
+                                }
+                            },
+                    )
                 }
             }
         }
@@ -235,17 +294,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 it.copy(statusMessage = str(R.string.trail_upload_failed, e.message ?: ""))
             }
         }
-    }
-
-    private fun prependRecent(report: ReportRemote, label: String) {
-        val item =
-            RecentItem(
-                id = report.id,
-                label = label,
-                description = report.description,
-                createdAt = report.createdAt,
-            )
-        _state.update { it.copy(recent = (listOf(item) + it.recent).take(30)) }
     }
 
     private fun vibrate() {

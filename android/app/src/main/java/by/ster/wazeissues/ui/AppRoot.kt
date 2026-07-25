@@ -50,8 +50,12 @@ import by.ster.wazeissues.R
 private val SpeedSignRed = Color(0xFFE30613)
 private val SpeedSignBg = Color(0xFFFFFFF8)
 private val SpeedSignText = Color(0xFF1A1A1A)
+private val SpeedEndGrey = Color(0xFF7A7A7A)
 private val BumpAddBg = Color(0xFF1B7A3D)
 private val BumpRemoveBg = Color(0xFFB3261E)
+private val SyncOk = Color(0xFF2E7D32)
+private val SyncFail = Color(0xFFC62828)
+private val SyncPending = Color(0xFF9E9E9E)
 
 @Composable
 fun AppRoot(vm: MainViewModel = viewModel()) {
@@ -94,79 +98,88 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
                 stringResource(R.string.status_idle, nickShown)
             },
             fontSize = 12.sp,
-            modifier = Modifier.padding(bottom = 8.dp),
+            modifier = Modifier.padding(bottom = 6.dp),
         )
 
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             BumpActionButton(
                 add = true,
-                enabled = !state.busy,
                 onClick = { vm.reportBump(true) },
                 modifier = Modifier.weight(1f),
             )
             BumpActionButton(
                 add = false,
-                enabled = !state.busy,
                 onClick = { vm.reportBump(false) },
                 modifier = Modifier.weight(1f),
             )
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
         GeneralIssueButton(
-            enabled = !state.busy,
             onClick = { vm.reportGeneral() },
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
         Text(
             stringResource(R.string.speed_limit_section),
             style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(bottom = 6.dp),
+            modifier = Modifier.padding(bottom = 4.dp),
         )
-        val speeds = listOf(40, 60, 70, 90, 100, 110, 120)
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            speeds.chunked(4).forEach { row ->
+        // 0 = end of speed limit
+        val speeds = listOf(20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 0)
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            speeds.chunked(6).forEach { row ->
                 Row(
                     Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     row.forEach { kmh ->
-                        SpeedLimitButton(
-                            kmh = kmh,
-                            enabled = !state.busy,
-                            onClick = { vm.reportSpeed(kmh) },
-                            modifier = Modifier.weight(1f),
-                        )
+                        if (kmh == 0) {
+                            SpeedLimitEndButton(
+                                onClick = { vm.reportSpeed(0) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        } else {
+                            SpeedLimitButton(
+                                kmh = kmh,
+                                onClick = { vm.reportSpeed(kmh) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
                     }
-                    repeat(4 - row.size) {
+                    repeat(6 - row.size) {
                         Spacer(Modifier.weight(1f))
                     }
                 }
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(8.dp))
         Text(stringResource(R.string.recent), style = MaterialTheme.typography.titleSmall)
         LazyColumn(Modifier.weight(1f)) {
             items(state.recent, key = { it.id }) { item ->
-                Column(
+                Row(
                     Modifier
                         .fillMaxWidth()
                         .clickable { vm.openEdit(item) }
-                        .padding(vertical = 6.dp),
+                        .padding(vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(item.label, style = MaterialTheme.typography.bodyLarge)
-                    Text(
-                        item.description?.takeIf { it.isNotBlank() }
-                            ?: stringResource(R.string.tap_to_add_note),
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    SyncIndicator(item.syncStatus)
+                    Spacer(Modifier.width(8.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(item.label, style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            item.description?.takeIf { it.isNotBlank() }
+                                ?: stringResource(R.string.tap_to_add_note),
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
@@ -174,8 +187,33 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
 }
 
 @Composable
+private fun SyncIndicator(status: SyncStatus) {
+    val (symbol, color) =
+        when (status) {
+            SyncStatus.Synced -> "✓" to SyncOk
+            SyncStatus.Pending -> "…" to SyncPending
+            SyncStatus.Failed -> "!" to SyncFail
+        }
+    Box(
+        modifier =
+            Modifier
+                .size(22.dp)
+                .clip(CircleShape)
+                .border(1.5.dp, color, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            symbol,
+            color = color,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
 private fun GeneralIssueButton(
-    enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -183,11 +221,11 @@ private fun GeneralIssueButton(
     Box(
         modifier =
             modifier
-                .height(72.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(if (enabled) bg else bg.copy(alpha = 0.45f))
-                .clickable(enabled = enabled, onClick = onClick)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .height(56.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(bg)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(
@@ -197,7 +235,7 @@ private fun GeneralIssueButton(
             Box(
                 modifier =
                     Modifier
-                        .size(40.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFFFC107)),
                 contentAlignment = Alignment.Center,
@@ -205,22 +243,22 @@ private fun GeneralIssueButton(
                 Text(
                     "!",
                     color = Color(0xFF212121),
-                    fontSize = 22.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                 )
             }
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(10.dp))
             Column {
                 Text(
                     stringResource(R.string.general_issue),
                     color = Color.White,
-                    fontSize = 17.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     stringResource(R.string.general_issue_hint),
                     color = Color.White.copy(alpha = 0.85f),
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                 )
             }
         }
@@ -230,7 +268,6 @@ private fun GeneralIssueButton(
 @Composable
 private fun BumpActionButton(
     add: Boolean,
-    enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -239,11 +276,11 @@ private fun BumpActionButton(
     Box(
         modifier =
             modifier
-                .height(104.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(if (enabled) bg else bg.copy(alpha = 0.45f))
-                .clickable(enabled = enabled, onClick = onClick)
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .height(64.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(bg)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(
@@ -252,20 +289,20 @@ private fun BumpActionButton(
         ) {
             SpeedBumpIcon(
                 add = add,
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(32.dp),
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(8.dp))
             Column {
                 Text(
                     label,
                     color = Color.White,
-                    fontSize = 17.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Text(
                     stringResource(R.string.speed_bump),
                     color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 14.sp,
+                    fontSize = 11.sp,
                 )
             }
         }
@@ -327,7 +364,6 @@ private fun SpeedBumpIcon(
 @Composable
 private fun SpeedLimitButton(
     kmh: Int,
-    enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -336,31 +372,72 @@ private fun SpeedLimitButton(
             modifier
                 .aspectRatio(1f)
                 .clip(CircleShape)
-                .clickable(enabled = enabled, onClick = onClick),
+                .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Box(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(2.dp)
+                    .padding(1.dp)
                     .clip(CircleShape)
-                    .background(if (enabled) SpeedSignBg else SpeedSignBg.copy(alpha = 0.5f))
+                    .background(SpeedSignBg)
                     .border(
-                        width = 5.dp,
-                        color = if (enabled) SpeedSignRed else SpeedSignRed.copy(alpha = 0.45f),
+                        width = 3.dp,
+                        color = SpeedSignRed,
                         shape = CircleShape,
                     ),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = "$kmh",
-                color = if (enabled) SpeedSignText else SpeedSignText.copy(alpha = 0.45f),
-                fontSize = if (kmh >= 100) 20.sp else 24.sp,
+                color = SpeedSignText,
+                fontSize = if (kmh >= 100) 12.sp else 14.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
-                lineHeight = 24.sp,
+                lineHeight = 14.sp,
             )
+        }
+    }
+}
+
+/** European-style end of all restrictions / end of speed limit. */
+@Composable
+private fun SpeedLimitEndButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .aspectRatio(1f)
+                .clip(CircleShape)
+                .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(1.dp)
+                    .clip(CircleShape)
+                    .background(SpeedSignBg)
+                    .border(
+                        width = 2.5.dp,
+                        color = SpeedEndGrey,
+                        shape = CircleShape,
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(Modifier.fillMaxSize().padding(6.dp)) {
+                drawLine(
+                    color = SpeedEndGrey,
+                    start = Offset(0f, 0f),
+                    end = Offset(size.width, size.height),
+                    strokeWidth = size.minDimension * 0.18f,
+                    cap = StrokeCap.Round,
+                )
+            }
         }
     }
 }

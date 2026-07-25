@@ -29,6 +29,7 @@
     <string name="label_bump_add">Ляжачы +</string>
     <string name="label_bump_remove">Ляжачы −</string>
     <string name="label_speed_kmh">%1$d км/г</string>
+    <string name="label_speed_end">Канец абмежавання</string>
     <string name="label_general">Агульная праблема</string>
 
     <string name="settings_saved">Налады захаваны</string>
@@ -36,6 +37,8 @@
     <string name="note_save_failed">Не ўдалося захаваць нататку</string>
     <string name="need_nick">Спачатку пазначце нік у Наладах</string>
     <string name="need_api_key">Спачатку пазначце API-ключ у Наладах</string>
+    <string name="queued">У чарзе: %1$s</string>
+    <string name="wait_until_synced">Дачакайцеся загрузкі, каб дадаць нататку</string>
     <string name="sent">Адпраўлена: %1$s</string>
     <string name="send_failed">Памылка адпраўкі</string>
     <string name="trail_too_short">Траекторыя занадта кароткая для напрамку</string>

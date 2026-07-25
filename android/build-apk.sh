@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
-# Build debug APK using Docker (no local Android Studio / SDK required after first SDK cache).
+# Build signed release APK using Docker (no local Android Studio / SDK required after first SDK cache).
 # Usage (from repo root):
 #   ./android/build-apk.sh
 #   ./android/build-apk.sh --publish   # also scp to VPS as app.apk
+#
+# Requires android/signing/keystore.properties + keystore file (gitignored).
+# Generate once: ./android/signing/create-keystore.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ANDROID_DIR="$ROOT/android"
 SDK_CACHE="${ANDROID_SDK_CACHE:-$HOME/.android-sdk-docker}"
-OUT_APK="$ANDROID_DIR/app/build/outputs/apk/debug/app-debug.apk"
+SIGNING_DIR="$ANDROID_DIR/signing"
+OUT_APK="$ANDROID_DIR/app/build/outputs/apk/release/app-release.apk"
 PUBLISH=0
 
 for arg in "$@"; do
@@ -21,9 +25,22 @@ for arg in "$@"; do
   esac
 done
 
+if [[ ! -f "$SIGNING_DIR/keystore.properties" ]]; then
+  echo "ERROR: Missing $SIGNING_DIR/keystore.properties" >&2
+  echo "Run: ./android/signing/create-keystore.sh" >&2
+  exit 1
+fi
+
+STORE_FILE="$(grep -E '^storeFile=' "$SIGNING_DIR/keystore.properties" | cut -d= -f2-)"
+if [[ ! -f "$SIGNING_DIR/$STORE_FILE" ]]; then
+  echo "ERROR: Keystore not found: $SIGNING_DIR/$STORE_FILE" >&2
+  echo "Run: ./android/signing/create-keystore.sh" >&2
+  exit 1
+fi
+
 mkdir -p "$SDK_CACHE"
 
-echo "==> Building debug APK (Docker + cached SDK at $SDK_CACHE)"
+echo "==> Building signed release APK (Docker + cached SDK at $SDK_CACHE)"
 docker run --rm \
   -v "$ANDROID_DIR:/project" \
   -v "$SDK_CACHE:/opt/android-sdk" \
@@ -50,8 +67,8 @@ sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
 
 cd /project
 chmod +x ./gradlew
-./gradlew assembleDebug --no-daemon
-ls -la app/build/outputs/apk/debug/
+./gradlew assembleRelease --no-daemon
+ls -la app/build/outputs/apk/release/
 '
 
 if [[ ! -f "$OUT_APK" ]]; then

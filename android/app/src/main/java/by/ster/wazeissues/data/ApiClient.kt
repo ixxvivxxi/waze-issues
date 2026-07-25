@@ -41,6 +41,7 @@ class ApiClient(
         lat: Double,
         reporterNick: String,
         valueKmh: Int? = null,
+        clientEventId: String = UUID.randomUUID().toString(),
     ): ReportRemote {
         val payload = JSONObject()
         if (valueKmh != null) payload.put("valueKmh", valueKmh)
@@ -51,7 +52,7 @@ class ApiClient(
                 .put("lat", lat)
                 .put("reporterNick", reporterNick)
                 .put("payload", payload)
-                .put("clientEventId", UUID.randomUUID().toString())
+                .put("clientEventId", clientEventId)
         val req =
             Request.Builder()
                 .url("${baseUrlProvider().trimEnd('/')}/api/reports")

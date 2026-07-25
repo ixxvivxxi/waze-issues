@@ -167,7 +167,41 @@
   }
 
   /** Belarus / EU style circular speed-limit sign (3.24). */
+  function speedLimitEndSignDataUrl() {
+    const key = 'sl:end';
+    if (iconCache[key]) return iconCache[key];
+    const s = ICON_PX;
+    const c = document.createElement('canvas');
+    c.width = s;
+    c.height = s;
+    const ctx = c.getContext('2d');
+    const cx = s / 2;
+    const cy = s / 2;
+    const r = s / 2 - 1.5;
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.lineWidth = Math.max(2.5, s * 0.08);
+    ctx.strokeStyle = '#7a7a7a';
+    ctx.stroke();
+
+    const inset = s * 0.22;
+    ctx.beginPath();
+    ctx.moveTo(inset, inset);
+    ctx.lineTo(s - inset, s - inset);
+    ctx.lineWidth = Math.max(3, s * 0.14);
+    ctx.strokeStyle = '#7a7a7a';
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    iconCache[key] = c.toDataURL('image/png');
+    return iconCache[key];
+  }
+
   function speedLimitSignDataUrl(kmh) {
+    if (kmh === 0 || kmh === '0') return speedLimitEndSignDataUrl();
     const key = 'sl:' + kmh;
     if (iconCache[key]) return iconCache[key];
     const s = ICON_PX;
@@ -278,6 +312,7 @@
   function iconForReport(r) {
     if (r.issueType === 'speed_limit') {
       const kmh = r.payload && r.payload.valueKmh != null ? Number(r.payload.valueKmh) : NaN;
+      if (kmh === 0) return speedLimitEndSignDataUrl();
       return speedLimitSignDataUrl(Number.isFinite(kmh) ? kmh : '?');
     }
     if (r.issueType === 'general') return generalIssueDataUrl();
@@ -289,6 +324,7 @@
   function labelForReport(r) {
     if (r.issueType === 'speed_limit') {
       const kmh = r.payload && r.payload.valueKmh != null ? r.payload.valueKmh : '?';
+      if (Number(kmh) === 0) return 'End of speed limit';
       return String(kmh) + ' km/h';
     }
     if (r.issueType === 'general') return 'General issue';

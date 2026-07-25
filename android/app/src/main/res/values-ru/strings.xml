@@ -29,6 +29,7 @@
     <string name="label_bump_add">Лежачий +</string>
     <string name="label_bump_remove">Лежачий −</string>
     <string name="label_speed_kmh">%1$d км/ч</string>
+    <string name="label_speed_end">Конец ограничения</string>
     <string name="label_general">Общая проблема</string>
 
     <string name="settings_saved">Настройки сохранены</string>
@@ -36,6 +37,8 @@
     <string name="note_save_failed">Не удалось сохранить заметку</string>
     <string name="need_nick">Сначала укажите ник в Настройках</string>
     <string name="need_api_key">Сначала укажите API-ключ в Настройках</string>
+    <string name="queued">В очереди: %1$s</string>
+    <string name="wait_until_synced">Дождитесь загрузки, чтобы добавить заметку</string>
     <string name="sent">Отправлено: %1$s</string>
     <string name="send_failed">Ошибка отправки</string>
     <string name="trail_too_short">Траектория слишком короткая для направления</string>

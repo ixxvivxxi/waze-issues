@@ -19,7 +19,7 @@ Phone → server → database tool for flagging Waze map problems while driving 
 - `GET /api/reports/bbox?minLon&minLat&maxLon&maxLat&status=pending`
 - `GET /` — health `{ ok, service: "waze-issues" }`
 
-Issue types: `speed_bump_add`, `speed_bump_remove`, `speed_limit` (valueKmh ∈ 40,60,70,90,100,110,120), `general`.
+Issue types: `speed_bump_add`, `speed_bump_remove`, `speed_limit` (valueKmh ∈ 0,20,30,40,50,60,70,80,90,100,110,120; `0` = end of limit), `general`.
 
 Shared Postgres on the VPS has **no PostGIS**; coordinates are `lon`/`lat` doubles and `trajectory` JSONB.
 
@@ -69,66 +69,40 @@ In the app: **Settings** → nick + API key (same as server `API_KEY` in `deploy
 
 ### Build APK (Docker — recommended on this machine)
 
-There is usually **no** local Android Studio / `ANDROID_HOME`. Build with JDK Docker image + a cached SDK directory.
+Signed **release** APK (same key every time → phone can update without uninstall).
 
-**One-liner script** (from repo root `/home/anton/projects/waze-issues`):
+First-time signing setup (already done on this machine; keep a backup of `android/signing/`):
+
+```bash
+chmod +x android/signing/create-keystore.sh
+./android/signing/create-keystore.sh
+```
+
+Build / publish:
 
 ```bash
 chmod +x android/build-apk.sh
-./android/build-apk.sh            # writes android/app/build/outputs/apk/debug/app-debug.apk
-                                  # and copies to deploy/public/app.apk
-./android/build-apk.sh --publish  # also scp to VPS (SSH host myvps-tunnel / ster@95.128.71.94)
+./android/build-apk.sh            # → android/.../apk/release/app-release.apk
+                                  # and deploy/public/app.apk
+./android/build-apk.sh --publish  # also scp to VPS (SSH host myvps-tunnel)
 ```
 
-**Manual equivalent:**
+`versionCode` in `android/app/build.gradle.kts` must increase on each published build, or Android will refuse the update.
 
-```bash
-cd /home/anton/projects/waze-issues
-mkdir -p "$HOME/.android-sdk-docker"
+**Play Protect / “App blocked”:** sideloaded APKs (not from Play Store) can still show a warning — tap **Install anyway**. A release signature reduces false positives vs debug builds, but only Play Store distribution removes the warning fully.
 
-docker run --rm \
-  -v "$PWD/android:/project" \
-  -v "$HOME/.android-sdk-docker:/opt/android-sdk" \
-  -w /project \
-  eclipse-temurin:17-jdk \
-  bash -lc '
-    set -e
-    export ANDROID_HOME=/opt/android-sdk
-    export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
-    if [ ! -d "$ANDROID_HOME/cmdline-tools/latest" ]; then
-      apt-get update -qq && apt-get install -y -qq wget unzip >/dev/null
-      mkdir -p "$ANDROID_HOME/cmdline-tools"
-      cd /tmp
-      wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdtools.zip
-      unzip -q cmdtools.zip -d "$ANDROID_HOME/cmdline-tools"
-      mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
-    fi
-    yes | sdkmanager --licenses >/dev/null || true
-    sdkmanager "platforms;android-35" "build-tools;35.0.0" "platform-tools"
-    cd /project && ./gradlew assembleDebug --no-daemon
-  '
-
-# Output:
-#   android/app/build/outputs/apk/debug/app-debug.apk
-
-cp android/app/build/outputs/apk/debug/app-debug.apk deploy/public/app.apk
-scp deploy/public/app.apk myvps-tunnel:~/waze-issues/deploy/public/app.apk
-# Download: https://waze-issues.ster.by/app.apk
-```
-
-Notes for another agent/chat:
+**One-time reinstall:** the first release-signed APK cannot update over old debug builds (different signature). Uninstall once, then install; later updates overwrite in place.
 
 | Item | Value |
 |------|-------|
 | Repo | `/home/anton/projects/waze-issues` (GitHub `ixxvivxxi/waze-issues`) |
 | SDK cache | `~/.android-sdk-docker` (reuse across builds; first run is slow) |
 | Docker image | `eclipse-temurin:17-jdk` |
-| Gradle | `android/gradlew assembleDebug` |
+| Gradle | `android/gradlew assembleRelease` (signed) |
+| Signing | `android/signing/` (gitignored keystore — back it up) |
 | Publish SSH | host `myvps-tunnel` → user `ster`, key `~/.ssh/id_ed25519_autossh` |
 | Live APK URL | `https://waze-issues.ster.by/app.apk` |
-| CI | `.github/workflows/build-android.yml` builds APK artifact only (no auto-publish yet) |
-
-If you have a local SDK instead: `cd android && ./gradlew assembleDebug`.
+| CI | `.github/workflows/build-android.yml` — release if keystore secrets set, else debug |
 
 ## WME userscript
 
@@ -143,7 +117,7 @@ Install [`wme-waze-issues.user.js`](wme-waze-issues.user.js) in Tampermonkey (al
 ## GitHub Actions
 
 - [`build-server.yml`](.github/workflows/build-server.yml) — `docker build` only
-- [`build-android.yml`](.github/workflows/build-android.yml) — assemble debug APK artifact
+- [`build-android.yml`](.github/workflows/build-android.yml) — release APK when keystore secrets exist, otherwise debug artifact
 
 **Deploy workflow is deferred** until SSH/registry secrets can be added.
 

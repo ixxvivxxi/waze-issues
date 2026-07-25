@@ -22,7 +22,8 @@ const ISSUE_TYPES: IssueType[] = [
   'general',
 ];
 
-const SPEED_VALUES = [40, 60, 70, 90, 100, 110, 120];
+/** 0 = end of speed limit (отмена ограничения). */
+const SPEED_VALUES = [0, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120];
 
 export class CreateReportDto {
   @IsIn(ISSUE_TYPES)

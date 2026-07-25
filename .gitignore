@@ -12,6 +12,9 @@ android/**/build/
 android/captures/
 android/*.iml
 android/.idea/
+android/signing/*.keystore
+android/signing/*.jks
+android/signing/keystore.properties
 
 # Node
 server/node_modules/

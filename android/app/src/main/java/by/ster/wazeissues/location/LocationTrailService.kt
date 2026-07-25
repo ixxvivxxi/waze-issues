@@ -18,14 +18,18 @@ import com.google.android.gms.location.Priority
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class LocationTrailService : Service() {
-    private val scope = CoroutineScope(Dispatchers.Main + Job())
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val fused by lazy { LocationServices.getFusedLocationProviderClient(this) }
     private val points = mutableListOf<LonLat>()
     private var reportId: String? = null
+    private var trailJob: Job? = null
+    private var updatesActive = false
 
     private val callback =
         object : LocationCallback() {
@@ -46,33 +50,47 @@ class LocationTrailService : Service() {
                 return START_NOT_STICKY
             }
             else -> {
-                reportId = intent?.getStringExtra(EXTRA_REPORT_ID)
+                val nextId = intent?.getStringExtra(EXTRA_REPORT_ID)
+                flushCurrentTrail()
+                reportId = nextId
                 startForeground(NOTIF_ID, buildNotification())
                 points.clear()
-                val req =
-                    LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L)
-                        .setMinUpdateIntervalMillis(500L)
-                        .setWaitForAccurateLocation(false)
-                        .build()
-                fused.requestLocationUpdates(req, callback, mainLooper)
-                scope.launch {
-                    delay(TRAIL_MS)
-                    stopSelf()
+                if (!updatesActive) {
+                    val req =
+                        LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L)
+                            .setMinUpdateIntervalMillis(500L)
+                            .setWaitForAccurateLocation(false)
+                            .build()
+                    fused.requestLocationUpdates(req, callback, mainLooper)
+                    updatesActive = true
                 }
+                trailJob?.cancel()
+                trailJob =
+                    scope.launch {
+                        delay(TRAIL_MS)
+                        stopSelf()
+                    }
             }
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
-        fused.removeLocationUpdates(callback)
-        val id = reportId
-        if (id != null && points.size >= 2) {
-            TrailBus.finish(id, points.toList())
-        } else if (id != null) {
-            TrailBus.finish(id, points.toList())
+        trailJob?.cancel()
+        if (updatesActive) {
+            fused.removeLocationUpdates(callback)
+            updatesActive = false
         }
+        flushCurrentTrail()
+        scope.cancel()
         super.onDestroy()
+    }
+
+    private fun flushCurrentTrail() {
+        val id = reportId ?: return
+        reportId = null
+        TrailBus.finish(id, points.toList())
+        points.clear()
     }
 
     private fun buildNotification(): Notification {
