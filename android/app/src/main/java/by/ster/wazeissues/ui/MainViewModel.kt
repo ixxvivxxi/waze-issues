@@ -25,7 +25,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -141,8 +140,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             viewModelScope.launch { uploadTrajectory(id, points) }
         }
         viewModelScope.launch {
-            val base = settings.apiBase.first()
-            checkForUpdate(base)
+            checkForUpdate()
         }
         // Keep retrying failed uploads while the reporter UI is open.
         viewModelScope.launch {
@@ -159,9 +157,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         private const val RETRY_INTERVAL_MS = 15_000L
     }
 
-    private suspend fun checkForUpdate(base: String) {
-        if (base.isBlank()) return
-        val latest = withContext(Dispatchers.IO) { api.fetchLatestVersion(base) } ?: return
+    private suspend fun checkForUpdate() {
+        val latest = withContext(Dispatchers.IO) { api.fetchLatestVersion() } ?: return
         if (latest.versionCode > BuildConfig.VERSION_CODE) {
             _state.update {
                 it.copy(updateAvailable = UpdateInfo(latest.versionName, latest.apkUrl))

@@ -3,7 +3,9 @@
 // @description     Show driving map reports from waze-issues.ster.by: speed-limit road signs and speed-bump markers; Done / Dismiss.
 // @namespace       https://github.com/ixxvivxxi/wme-scripts
 // @homepageURL     https://github.com/ixxvivxxi/waze-issues
-// @version         2026.07.26.005
+// @version         2026.07.26.006
+// @updateURL       https://raw.githubusercontent.com/ixxvivxxi/waze-issues/main/wme-waze-issues.user.js
+// @downloadURL     https://raw.githubusercontent.com/ixxvivxxi/waze-issues/main/wme-waze-issues.user.js
 // @match           https://www.waze.com/*/editor*
 // @match           https://www.waze.com/editor*
 // @match           https://beta.waze.com/*/editor*
@@ -28,6 +30,8 @@
   const STORAGE_API_BASE = 'wmeWazeIssues_apiBase';
   const STORAGE_FOLLOW = 'wmeWazeIssues_followMap';
   const DEFAULT_API_BASE = 'https://waze-issues.ster.by';
+  const SCRIPT_INSTALL_URL =
+    'https://raw.githubusercontent.com/ixxvivxxi/waze-issues/main/wme-waze-issues.user.js';
   const ICON_PX = 36;
   const MAX_BBOX_SPAN_DEG = 0.34;
   /** GPS accuracy disc — strong enough to see at street zoom. */
@@ -1074,6 +1078,16 @@
       });
     });
     root.appendChild(reload);
+
+    const updateRow = document.createElement('div');
+    updateRow.style.cssText = 'margin-top:8px;font-size:12px';
+    const updateLink = document.createElement('a');
+    updateLink.href = SCRIPT_INSTALL_URL;
+    updateLink.target = '_blank';
+    updateLink.rel = 'noopener';
+    updateLink.textContent = 'Update userscript';
+    updateRow.appendChild(updateLink);
+    root.appendChild(updateRow);
 
     statusEl = document.createElement('div');
     statusEl.style.cssText = 'margin-top:8px;font-size:12px;color:#333';

@@ -1,5 +1,6 @@
 package by.ster.wazeissues.data
 
+import by.ster.wazeissues.BuildConfig
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -68,13 +69,13 @@ class ApiClient(
         return parseReport(execute(req))
     }
 
-    /** Reads the published version.json next to the APK. Null on any failure. */
-    fun fetchLatestVersion(baseUrl: String): AppVersion? {
-        val base = baseUrl.trimEnd('/')
+    /** Reads version.json from the GitHub Releases rolling tag. Null on any failure. */
+    fun fetchLatestVersion(): AppVersion? {
         val req =
             Request.Builder()
-                .url("$base/version.json")
+                .url(BuildConfig.UPDATE_MANIFEST_URL)
                 .get()
+                .header("Accept", "application/octet-stream")
                 .build()
         return try {
             client.newCall(req).execute().use { resp ->
@@ -85,7 +86,8 @@ class ApiClient(
                 AppVersion(
                     versionCode = code,
                     versionName = obj.optString("versionName"),
-                    apkUrl = obj.optString("apkUrl").ifBlank { "$base/app.apk" },
+                    apkUrl =
+                        obj.optString("apkUrl").ifBlank { BuildConfig.DEFAULT_APK_URL },
                 )
             }
         } catch (_: Exception) {

@@ -2,10 +2,11 @@
 # Build signed release APK using Docker (no local Android Studio / SDK required after first SDK cache).
 # Usage (from repo root):
 #   ./android/build-apk.sh
-#   ./android/build-apk.sh --publish   # also scp to VPS as app.apk
+#   ./android/build-apk.sh --publish   # upload to GitHub Releases (android-latest)
 #
 # Requires android/signing/keystore.properties + keystore file (gitignored).
 # Generate once: ./android/signing/create-keystore.sh
+# Publish needs: gh auth login (repo scope)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -14,6 +15,9 @@ SDK_CACHE="${ANDROID_SDK_CACHE:-$HOME/.android-sdk-docker}"
 SIGNING_DIR="$ANDROID_DIR/signing"
 OUT_APK="$ANDROID_DIR/app/build/outputs/apk/release/app-release.apk"
 PUBLISH=0
+REPO="${GITHUB_REPOSITORY:-ixxvivxxi/waze-issues}"
+APK_RELEASE_TAG="android-latest"
+APK_URL="https://github.com/${REPO}/releases/download/${APK_RELEASE_TAG}/app.apk"
 
 for arg in "$@"; do
   case "$arg" in
@@ -76,24 +80,54 @@ if [[ ! -f "$OUT_APK" ]]; then
   exit 1
 fi
 
-mkdir -p "$ROOT/deploy/public"
-cp -f "$OUT_APK" "$ROOT/deploy/public/app.apk"
-echo "==> Copied to deploy/public/app.apk ($(wc -c < "$ROOT/deploy/public/app.apk") bytes)"
-
 GRADLE="$ANDROID_DIR/app/build.gradle.kts"
 VERSION_CODE="$(grep -oP 'versionCode\s*=\s*\K[0-9]+' "$GRADLE" | head -1)"
 VERSION_NAME="$(grep -oP 'versionName\s*=\s*"\K[^"]+' "$GRADLE" | head -1)"
-APK_URL="https://waze-issues.ster.by/app.apk"
+STAGE="$ROOT/publish-apk"
+mkdir -p "$STAGE"
+cp -f "$OUT_APK" "$STAGE/app.apk"
 printf '{"versionCode":%s,"versionName":"%s","apkUrl":"%s"}\n' \
-  "$VERSION_CODE" "$VERSION_NAME" "$APK_URL" > "$ROOT/deploy/public/version.json"
-echo "==> Wrote version.json (code=$VERSION_CODE name=$VERSION_NAME)"
+  "$VERSION_CODE" "$VERSION_NAME" "$APK_URL" > "$STAGE/version.json"
+echo "==> Staged $STAGE/app.apk + version.json (code=$VERSION_CODE name=$VERSION_NAME)"
 
 if [[ "$PUBLISH" -eq 1 ]]; then
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "ERROR: gh CLI required for --publish" >&2
+    exit 1
+  fi
+  VER_TAG="android-v${VERSION_NAME}"
+  echo "==> Publishing to GitHub Releases ($REPO)"
+  if gh release view "$VER_TAG" --repo "$REPO" >/dev/null 2>&1; then
+    gh release upload "$VER_TAG" "$STAGE/app.apk" "$STAGE/version.json" --repo "$REPO" --clobber
+  else
+    gh release create "$VER_TAG" "$STAGE/app.apk" "$STAGE/version.json" --repo "$REPO" \
+      --title "Android ${VERSION_NAME}" \
+      --notes "Signed release APK ${VERSION_NAME}." \
+      --latest=false
+  fi
+  if gh release view "$APK_RELEASE_TAG" --repo "$REPO" >/dev/null 2>&1; then
+    gh release upload "$APK_RELEASE_TAG" "$STAGE/app.apk" "$STAGE/version.json" --repo "$REPO" --clobber
+  else
+    gh release create "$APK_RELEASE_TAG" "$STAGE/app.apk" "$STAGE/version.json" --repo "$REPO" \
+      --title "Android (latest)" \
+      --notes "Rolling latest APK + version.json for in-app updates." \
+      --latest=false
+  fi
+  echo "==> Live at $APK_URL"
+  echo "==> Manifest: https://github.com/${REPO}/releases/download/${APK_RELEASE_TAG}/version.json"
+
+  # Also mirror to VPS so older app builds (checking ster.by/version.json) can upgrade once.
   SSH_HOST="${WAZE_ISSUES_SSH:-myvps}"
-  echo "==> Publishing to VPS ($SSH_HOST:~/waze-issues/deploy/public/)"
-  scp "$ROOT/deploy/public/app.apk" "${SSH_HOST}:~/waze-issues/deploy/public/app.apk"
-  scp "$ROOT/deploy/public/version.json" "${SSH_HOST}:~/waze-issues/deploy/public/version.json"
-  echo "==> Live at $APK_URL (version.json alongside)"
+  if ssh -o BatchMode=yes -o ConnectTimeout=5 "$SSH_HOST" 'true' 2>/dev/null; then
+    echo "==> Mirroring APK + version.json to VPS ($SSH_HOST)"
+    scp "$STAGE/app.apk" "$STAGE/version.json" \
+      "${SSH_HOST}:~/waze-issues/deploy/public/"
+    scp "$ROOT/deploy/public/index.html" \
+      "${SSH_HOST}:~/waze-issues/deploy/public/index.html" || true
+    echo "==> Hosting mirror: https://waze-issues.ster.by/app.apk"
+  else
+    echo "==> Skip VPS mirror (ssh $SSH_HOST not available)"
+  fi
 fi
 
 echo "BUILD_OK: $OUT_APK"

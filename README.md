@@ -8,8 +8,9 @@ Phone → server → database tool for flagging Waze map problems while driving 
 | Android | [`android/`](android/) | Split-screen one-tap reporter |
 | Deploy | [`deploy/`](deploy/) | Docker Compose on VPS + nginx snippets |
 
-**Production:** `https://waze-issues.ster.by` (Let's Encrypt)  
-**APK:** `https://waze-issues.ster.by/app.apk`  
+**Production API:** `https://waze-issues.ster.by` (configurable in the app; domain may change)  
+**APK / updates:** [GitHub Releases `android-latest`](https://github.com/ixxvivxxi/waze-issues/releases/tag/android-latest)  
+**Userscript:** [raw on GitHub](https://raw.githubusercontent.com/ixxvivxxi/waze-issues/main/wme-waze-issues.user.js)  
 **Image:** `ghcr.io/ixxvivxxi/waze-issues:api`
 
 ## API (open for trusted users — no API key)
@@ -75,28 +76,35 @@ Manual deploy: `cd ~/waze-issues/deploy && ./deploy.sh`
 
 ## Android
 
-Default API base: `https://waze-issues.ster.by`. **Settings** → nick (+ optional API base). Use split-screen with Waze.
+Default API base: `https://waze-issues.ster.by` (change anytime in **Settings** — updates do not use this domain).
+
+In-app update check reads:
+`https://github.com/ixxvivxxi/waze-issues/releases/download/android-latest/version.json`
 
 ```bash
-./android/build-apk.sh            # release APK → deploy/public/app.apk
-./android/build-apk.sh --publish  # also scp to VPS
+./android/build-apk.sh            # release APK → ./publish-apk/
+./android/build-apk.sh --publish  # upload to GitHub Releases (needs gh auth)
 ```
 
 Bump `versionCode` in `android/app/build.gradle.kts` on each published build.
 
 ## WME userscript
 
-Install [`wme-waze-issues.user.js`](wme-waze-issues.user.js) in Tampermonkey.
+Install / update (raw GitHub):  
+https://raw.githubusercontent.com/ixxvivxxi/waze-issues/main/wme-waze-issues.user.js
+
+Tampermonkey uses `@updateURL` / `@downloadURL` pointing at that same file.
 
 1. Open WME → sidebar **Drive reports**
 2. API base `https://waze-issues.ster.by`
-3. Enable **Show pending reports** (zoom 14+)
+3. Enable **Show pending reports**
 4. Click a marker → **Done** / **Dismiss**
+5. Panel link **Update userscript** opens the raw install URL
 
 ## GitHub Actions
 
 - [`deploy.yml`](.github/workflows/deploy.yml) — build/push API image to GHCR + SSH deploy
-- [`build-android.yml`](.github/workflows/build-android.yml) — APK artifact
+- [`build-android.yml`](.github/workflows/build-android.yml) — signed APK → GitHub Releases (`android-latest` + `android-v*`)
 
 ## License
 
