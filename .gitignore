@@ -4,6 +4,7 @@
 server/.env
 deploy/.env.prod
 deploy/public/*.apk
+deploy/public/version.json
 
 # Android
 android/.gradle/
