@@ -19,7 +19,8 @@ Phone → server → database tool for flagging Waze map problems while driving 
 - `PATCH /api/reports/:id/trajectory` — `{ points: [{lon,lat},…], headingDeg? }`
 - `PATCH /api/reports/:id` — `{ description?`, `status? }`
 - `GET /api/reports/bbox?minLon&minLat&maxLon&maxLat&status=pending`
-- `GET /` — health `{ ok, service: "waze-issues" }`
+- `GET /` — HTML landing page (APK / userscript / short overview)
+- `GET /health` — health `{ ok, service: "waze-issues" }`
 
 Issue types: `speed_bump_add`, `speed_bump_remove`, `speed_limit` (valueKmh ∈ 0,20,30,40,50,60,70,80,90,100,110,120; `0` = end of limit), `general`.
 

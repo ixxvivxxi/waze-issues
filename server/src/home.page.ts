@@ -1,4 +1,5 @@
-<!doctype html>
+/** Landing page for GET /. Keep in sync with deploy/public/index.html. */
+export const HOME_PAGE_HTML = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -149,3 +150,4 @@
     </main>
   </body>
 </html>
+`;

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -76,15 +77,19 @@ fun AppRoot(vm: MainViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     MaterialTheme {
         Surface(Modifier.fillMaxSize()) {
-            when {
-                !state.settingsLoaded -> {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(stringResource(R.string.loading))
+            // targetSdk 35 draws edge-to-edge; keep chrome clear of status/nav bars
+            // (especially when this pane is the top half of a split screen).
+            Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+                when {
+                    !state.settingsLoaded -> {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text(stringResource(R.string.loading))
+                        }
                     }
+                    !state.settingsReady || state.showSettings -> SettingsScreen(state, vm)
+                    state.editingId != null -> EditNoteScreen(state, vm)
+                    else -> MainScreen(state, vm)
                 }
-                !state.settingsReady || state.showSettings -> SettingsScreen(state, vm)
-                state.editingId != null -> EditNoteScreen(state, vm)
-                else -> MainScreen(state, vm)
             }
         }
     }
