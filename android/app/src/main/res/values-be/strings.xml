@@ -57,4 +57,8 @@
     <string name="update_available">Даступная новая версія: %1$s</string>
     <string name="update_download">Абнавіць</string>
     <string name="update_later">Пазней</string>
+    <string name="update_downloading">Спампоўванне абнаўлення…</string>
+    <string name="update_installing">Адкрыццё ўсталёўшчыка…</string>
+    <string name="update_download_failed">Не ўдалося спампаваць абнаўленне</string>
+    <string name="update_allow_unknown">Дазвольце ўстаноўку гэтага прыкладання і зноў націсніце «Абнавіць»</string>
 </resources>

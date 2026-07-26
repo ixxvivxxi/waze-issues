@@ -57,4 +57,8 @@
     <string name="update_available">New version available: %1$s</string>
     <string name="update_download">Update</string>
     <string name="update_later">Later</string>
+    <string name="update_downloading">Downloading update…</string>
+    <string name="update_installing">Opening installer…</string>
+    <string name="update_download_failed">Update download failed</string>
+    <string name="update_allow_unknown">Allow installing this app, then tap Update again</string>
 </resources>

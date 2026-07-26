@@ -3,11 +3,14 @@ package by.ster.wazeissues.ui
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import android.provider.Settings
+import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import by.ster.wazeissues.AppLocales
@@ -30,6 +33,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.time.Instant
 import java.util.UUID
 import kotlin.math.atan2
@@ -85,6 +89,7 @@ data class UiState(
     val language: String = AppLocales.EN,
     /** Set when a newer APK is published on the server. */
     val updateAvailable: UpdateInfo? = null,
+    val updateDownloading: Boolean = false,
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -168,6 +173,67 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun dismissUpdate() {
         _state.update { it.copy(updateAvailable = null) }
+    }
+
+    /** Download APK in-process (follows GitHub redirects) and open the installer. */
+    fun downloadAndInstallUpdate() {
+        val info = _state.value.updateAvailable ?: return
+        if (_state.value.updateDownloading) return
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            _state.update {
+                it.copy(
+                    updateDownloading = true,
+                    statusMessage = str(R.string.update_downloading),
+                )
+            }
+            try {
+                if (Build.VERSION.SDK_INT >= 26 && !app.packageManager.canRequestPackageInstalls()) {
+                    _state.update {
+                        it.copy(
+                            updateDownloading = false,
+                            statusMessage = str(R.string.update_allow_unknown),
+                        )
+                    }
+                    val settings =
+                        Intent(
+                            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                            Uri.parse("package:${app.packageName}"),
+                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    app.startActivity(settings)
+                    return@launch
+                }
+                val dest = File(app.cacheDir, "waze-issues-update.apk")
+                if (dest.exists()) dest.delete()
+                withContext(Dispatchers.IO) { api.downloadApk(info.apkUrl, dest) }
+                val uri =
+                    FileProvider.getUriForFile(
+                        app,
+                        "${app.packageName}.fileprovider",
+                        dest,
+                    )
+                val install =
+                    Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, "application/vnd.android.package-archive")
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                app.startActivity(install)
+                _state.update {
+                    it.copy(
+                        updateDownloading = false,
+                        statusMessage = str(R.string.update_installing),
+                    )
+                }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        updateDownloading = false,
+                        statusMessage = e.message ?: str(R.string.update_download_failed),
+                    )
+                }
+            }
+        }
     }
 
     override fun onCleared() {

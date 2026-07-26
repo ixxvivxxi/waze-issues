@@ -36,7 +36,9 @@ class ApiClient(
     private val client =
         OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
+            .followRedirects(true)
+            .followSslRedirects(true)
             .build()
 
     private val jsonMedia = "application/json; charset=utf-8".toMediaType()
@@ -92,6 +94,31 @@ class ApiClient(
             }
         } catch (_: Exception) {
             null
+        }
+    }
+
+    /** Download APK following redirects (GitHub Releases). */
+    fun downloadApk(url: String, destFile: java.io.File): java.io.File {
+        val req =
+            Request.Builder()
+                .url(url)
+                .get()
+                .header("Accept", "application/vnd.android.package-archive,*/*")
+                .build()
+        client.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) {
+                throw IllegalStateException("HTTP ${resp.code}")
+            }
+            val body = resp.body ?: throw IllegalStateException("Empty APK body")
+            destFile.parentFile?.mkdirs()
+            body.byteStream().use { input ->
+                destFile.outputStream().use { output -> input.copyTo(output) }
+            }
+            if (destFile.length() < 1_000L) {
+                destFile.delete()
+                throw IllegalStateException("APK too small")
+            }
+            return destFile
         }
     }
 

@@ -40,9 +40,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import android.content.Intent
-import android.net.Uri
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -118,7 +115,8 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
         state.updateAvailable?.let { update ->
             UpdateBanner(
                 versionName = update.versionName,
-                apkUrl = update.apkUrl,
+                downloading = state.updateDownloading,
+                onUpdate = { vm.downloadAndInstallUpdate() },
                 onDismiss = { vm.dismissUpdate() },
             )
         }
@@ -493,10 +491,10 @@ private fun SpeedLimitEndButton(
 @Composable
 private fun UpdateBanner(
     versionName: String,
-    apkUrl: String,
+    downloading: Boolean,
+    onUpdate: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val context = LocalContext.current
     Surface(
         color = MaterialTheme.colorScheme.primaryContainer,
         shape = RoundedCornerShape(8.dp),
@@ -509,19 +507,19 @@ private fun UpdateBanner(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                stringResource(R.string.update_available, versionName),
+                if (downloading) {
+                    stringResource(R.string.update_downloading)
+                } else {
+                    stringResource(R.string.update_available, versionName)
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier.weight(1f),
             )
-            TextButton(onClick = {
-                context.startActivity(
-                    Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)),
-                )
-            }) {
+            TextButton(onClick = onUpdate, enabled = !downloading) {
                 Text(stringResource(R.string.update_download))
             }
-            TextButton(onClick = onDismiss) {
+            TextButton(onClick = onDismiss, enabled = !downloading) {
                 Text(stringResource(R.string.update_later))
             }
         }
