@@ -3,7 +3,7 @@
 // @description     Show driving map reports from waze-issues.ster.by: speed-limit road signs and speed-bump markers; Done / Dismiss.
 // @namespace       https://github.com/ixxvivxxi/wme-scripts
 // @homepageURL     https://github.com/ixxvivxxi/waze-issues
-// @version         2026.07.26.002
+// @version         2026.07.26.003
 // @match           https://www.waze.com/*/editor*
 // @match           https://www.waze.com/editor*
 // @match           https://beta.waze.com/*/editor*
@@ -28,7 +28,6 @@
   const STORAGE_API_BASE = 'wmeWazeIssues_apiBase';
   const STORAGE_FOLLOW = 'wmeWazeIssues_followMap';
   const DEFAULT_API_BASE = 'https://waze-issues.ster.by';
-  const MIN_ZOOM = 14;
   const ICON_PX = 36;
   const MAX_BBOX_SPAN_DEG = 0.34;
   const ACC_FILL = 'rgba(21, 101, 192, 0.14)';
@@ -836,20 +835,15 @@
       setStatus('Layer off');
       return;
     }
-    const z = getZoom();
-    if (z == null || z < MIN_ZOOM) {
-      clearLayers();
-      setStatus('Zoom to ' + MIN_ZOOM + '+ to load reports');
-      return;
-    }
     if (fetchInFlight) return;
     const bbox = await getViewportBBox();
     if (!bbox) {
       setStatus('No map extent yet');
       return;
     }
+    const z = getZoom();
     const key =
-      z.toFixed(1) +
+      (z != null && Number.isFinite(z) ? z.toFixed(1) : 'z') +
       ':' +
       bbox.minLon.toFixed(4) +
       ',' +
@@ -955,7 +949,7 @@
       debouncedLoad();
     });
     followRow.appendChild(followEl);
-    followRow.appendChild(document.createTextNode('Show pending reports (zoom ' + MIN_ZOOM + '+)'));
+    followRow.appendChild(document.createTextNode('Show pending reports'));
     root.appendChild(followRow);
 
     const baseLbl = document.createElement('div');
