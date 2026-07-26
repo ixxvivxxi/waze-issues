@@ -216,8 +216,14 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
                     Column(Modifier.weight(1f)) {
                         Text(item.label, style = MaterialTheme.typography.bodyLarge)
                         Text(
-                            item.description?.takeIf { it.isNotBlank() }
-                                ?: stringResource(R.string.tap_to_add_note),
+                            when {
+                                item.description?.isNotBlank() == true -> item.description
+                                item.syncStatus == SyncStatus.Failed ->
+                                    stringResource(R.string.tap_to_retry)
+                                item.syncStatus == SyncStatus.Pending ->
+                                    stringResource(R.string.sync_pending_hint)
+                                else -> stringResource(R.string.tap_to_add_note)
+                            },
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

@@ -3,7 +3,7 @@
 // @description     Show driving map reports from waze-issues.ster.by: speed-limit road signs and speed-bump markers; Done / Dismiss.
 // @namespace       https://github.com/ixxvivxxi/wme-scripts
 // @homepageURL     https://github.com/ixxvivxxi/waze-issues
-// @version         2026.07.26.003
+// @version         2026.07.26.005
 // @match           https://www.waze.com/*/editor*
 // @match           https://www.waze.com/editor*
 // @match           https://beta.waze.com/*/editor*
@@ -30,9 +30,16 @@
   const DEFAULT_API_BASE = 'https://waze-issues.ster.by';
   const ICON_PX = 36;
   const MAX_BBOX_SPAN_DEG = 0.34;
-  const ACC_FILL = 'rgba(21, 101, 192, 0.14)';
-  const ACC_STROKE = 'rgba(21, 101, 192, 0.55)';
+  /** GPS accuracy disc — strong enough to see at street zoom. */
+  const ACC_FILL = 'rgba(25, 118, 210, 0.38)';
+  const ACC_STROKE = 'rgba(13, 71, 161, 0.95)';
+  const ACC_STROKE_WIDTH = 2.5;
   const ACC_RING_POINTS = 48;
+  /** Travel direction arrow length / head size in meters. */
+  const HEADING_ARROW_M = 28;
+  const HEADING_HEAD_M = 9;
+  const HEADING_STROKE = '#e65100';
+  const HEADING_FILL = 'rgba(230, 81, 0, 0.9)';
 
   let sdk = null;
   let statusEl = null;
@@ -337,26 +344,51 @@
 
   /** WGS84 ring around (lon,lat) with geodesic radius in meters. */
   function accuracyRingLonLat(lon, lat, radiusM) {
-    const R = 6378137;
-    const lat1 = (lat * Math.PI) / 180;
-    const lon1 = (lon * Math.PI) / 180;
-    const ang = radiusM / R;
     const ring = [];
     for (let i = 0; i <= ACC_RING_POINTS; i++) {
-      const brng = (i * 2 * Math.PI) / ACC_RING_POINTS;
-      const lat2 = Math.asin(
-        Math.sin(lat1) * Math.cos(ang) +
-          Math.cos(lat1) * Math.sin(ang) * Math.cos(brng),
-      );
-      const lon2 =
-        lon1 +
-        Math.atan2(
-          Math.sin(brng) * Math.sin(ang) * Math.cos(lat1),
-          Math.cos(ang) - Math.sin(lat1) * Math.sin(lat2),
-        );
-      ring.push([(lon2 * 180) / Math.PI, (lat2 * 180) / Math.PI]);
+      const brng = (i * 360) / ACC_RING_POINTS;
+      ring.push(destinationLonLat(lon, lat, brng, radiusM));
     }
     return ring;
+  }
+
+  function destinationLonLat(lon, lat, bearingDeg, distM) {
+    const R = 6378137;
+    const brng = (bearingDeg * Math.PI) / 180;
+    const lat1 = (lat * Math.PI) / 180;
+    const lon1 = (lon * Math.PI) / 180;
+    const ang = distM / R;
+    const lat2 = Math.asin(
+      Math.sin(lat1) * Math.cos(ang) +
+        Math.cos(lat1) * Math.sin(ang) * Math.cos(brng),
+    );
+    const lon2 =
+      lon1 +
+      Math.atan2(
+        Math.sin(brng) * Math.sin(ang) * Math.cos(lat1),
+        Math.cos(ang) - Math.sin(lat1) * Math.sin(lat2),
+      );
+    return [(lon2 * 180) / Math.PI, (lat2 * 180) / Math.PI];
+  }
+
+  function headingDegOf(r) {
+    const h = r && r.headingDeg;
+    const n = Number(h);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  /** Shaft + arrowhead triangle in WGS84 for travel direction. */
+  function headingArrowLonLat(lon, lat, headingDeg) {
+    const tip = destinationLonLat(lon, lat, headingDeg, HEADING_ARROW_M);
+    const left = destinationLonLat(tip[0], tip[1], headingDeg + 155, HEADING_HEAD_M);
+    const right = destinationLonLat(tip[0], tip[1], headingDeg - 155, HEADING_HEAD_M);
+    return {
+      shaft: [
+        [lon, lat],
+        tip,
+      ],
+      head: [left, tip, right, left],
+    };
   }
 
   function packBBox(minLon, minLat, maxLon, maxLat) {
@@ -451,13 +483,33 @@
     try {
       ol2AccLayer = new OpenLayers.Layer.Vector(SCRIPT_ID + '-accuracy', {
         styleMap: new OpenLayers.StyleMap(
-          new OpenLayers.Style({
-            fillColor: '#1565c0',
-            fillOpacity: 0.14,
-            strokeColor: '#1565c0',
-            strokeOpacity: 0.55,
-            strokeWidth: 1,
-          }),
+          new OpenLayers.Style(
+            {
+              fillColor: '${fillColor}',
+              fillOpacity: '${fillOpacity}',
+              strokeColor: '${strokeColor}',
+              strokeOpacity: 0.95,
+              strokeWidth: '${strokeWidth}',
+              strokeLinecap: 'round',
+              strokeLinejoin: 'round',
+            },
+            {
+              context: {
+                fillColor: function (f) {
+                  return f.attributes.kind === 'heading' ? '#e65100' : '#1976d2';
+                },
+                fillOpacity: function (f) {
+                  return f.attributes.kind === 'heading' ? 0.9 : 0.38;
+                },
+                strokeColor: function (f) {
+                  return f.attributes.kind === 'heading' ? '#bf360c' : '#0d47a1';
+                },
+                strokeWidth: function (f) {
+                  return f.attributes.kind === 'heading' ? 4 : ACC_STROKE_WIDTH;
+                },
+              },
+            },
+          ),
         ),
         renderers: ['Canvas', 'SVG', 'VML'],
         displayInLayerSwitcher: false,
@@ -530,41 +582,40 @@
         source: src,
         zIndex: 900,
         style: function (feature) {
-          if (feature.get('kind') === 'accuracy') {
+          const kind = feature.get('kind');
+          if (kind === 'accuracy') {
             return new ol.style.Style({
               fill: new ol.style.Fill({ color: ACC_FILL }),
-              stroke: new ol.style.Stroke({ color: ACC_STROKE, width: 1 }),
+              stroke: new ol.style.Stroke({
+                color: ACC_STROKE,
+                width: ACC_STROKE_WIDTH,
+              }),
+            });
+          }
+          if (kind === 'heading-shaft') {
+            return new ol.style.Style({
+              stroke: new ol.style.Stroke({
+                color: HEADING_STROKE,
+                width: 4,
+                lineCap: 'round',
+                lineJoin: 'round',
+              }),
+            });
+          }
+          if (kind === 'heading-head') {
+            return new ol.style.Style({
+              fill: new ol.style.Fill({ color: HEADING_FILL }),
+              stroke: new ol.style.Stroke({ color: '#bf360c', width: 1.5 }),
             });
           }
           const url = feature.get('iconUrl');
-          const heading = feature.get('headingDeg');
-          const styles = [
-            new ol.style.Style({
-              image: new ol.style.Icon({
-                src: url,
-                scale: 1,
-                anchor: [0.5, 0.5],
-              }),
+          return new ol.style.Style({
+            image: new ol.style.Icon({
+              src: url,
+              scale: 1,
+              anchor: [0.5, 0.5],
             }),
-          ];
-          if (heading != null && Number.isFinite(Number(heading))) {
-            styles.push(
-              new ol.style.Style({
-                image: new ol.style.RegularShape({
-                  points: 3,
-                  radius: 7,
-                  rotation: ((Number(heading) + 180) * Math.PI) / 180,
-                  fill: new ol.style.Fill({ color: '#1565c0' }),
-                  stroke: new ol.style.Stroke({ color: '#fff', width: 1 }),
-                }),
-                geometry: function (f) {
-                  const c = f.getGeometry().getCoordinates();
-                  return new ol.geom.Point([c[0], c[1] + 18]);
-                },
-              }),
-            );
-          }
-          return styles;
+          });
         },
       });
       olm.addLayer(ol6Layer);
@@ -624,7 +675,7 @@
     if (!proj) return;
     const wgs = new OpenLayers.Projection('EPSG:4326');
     const markers = [];
-    const circles = [];
+    const overlays = [];
     for (let i = 0; i < reports.length; i++) {
       const r = reports[i];
       const lon = Number(r.lon);
@@ -641,10 +692,32 @@
           );
           pts.push(p);
         }
-        circles.push(
+        overlays.push(
           new OpenLayers.Feature.Vector(
             new OpenLayers.Geometry.Polygon([new OpenLayers.Geometry.LinearRing(pts)]),
-            { report: r },
+            { kind: 'accuracy', report: r },
+          ),
+        );
+      }
+      const heading = headingDegOf(r);
+      if (heading != null && ol2AccLayer) {
+        const arrow = headingArrowLonLat(lon, lat, heading);
+        const shaftPts = arrow.shaft.map(function (ll) {
+          return new OpenLayers.Geometry.Point(ll[0], ll[1]).transform(wgs, proj);
+        });
+        overlays.push(
+          new OpenLayers.Feature.Vector(new OpenLayers.Geometry.LineString(shaftPts), {
+            kind: 'heading',
+            report: r,
+          }),
+        );
+        const headPts = arrow.head.map(function (ll) {
+          return new OpenLayers.Geometry.Point(ll[0], ll[1]).transform(wgs, proj);
+        });
+        overlays.push(
+          new OpenLayers.Feature.Vector(
+            new OpenLayers.Geometry.Polygon([new OpenLayers.Geometry.LinearRing(headPts)]),
+            { kind: 'heading', report: r },
           ),
         );
       }
@@ -658,7 +731,7 @@
         }),
       );
     }
-    if (circles.length && ol2AccLayer) ol2AccLayer.addFeatures(circles);
+    if (overlays.length && ol2AccLayer) ol2AccLayer.addFeatures(overlays);
     if (markers.length) ol2Layer.addFeatures(markers);
   }
 
@@ -691,6 +764,30 @@
           }),
         );
       }
+      const heading = headingDegOf(r);
+      if (heading != null) {
+        const arrow = headingArrowLonLat(lon, lat, heading);
+        const shaft = arrow.shaft.map(function (ll) {
+          return ol.proj.fromLonLat(ll, fromProj);
+        });
+        const head = arrow.head.map(function (ll) {
+          return ol.proj.fromLonLat(ll, fromProj);
+        });
+        feats.push(
+          new ol.Feature({
+            geometry: new ol.geom.LineString(shaft),
+            kind: 'heading-shaft',
+            report: r,
+          }),
+        );
+        feats.push(
+          new ol.Feature({
+            geometry: new ol.geom.Polygon([head]),
+            kind: 'heading-head',
+            report: r,
+          }),
+        );
+      }
       const xy = ol.proj.fromLonLat([lon, lat], fromProj);
       feats.push(
         new ol.Feature({
@@ -698,7 +795,6 @@
           kind: 'marker',
           report: r,
           iconUrl: iconForReport(r),
-          headingDeg: r.headingDeg,
         }),
       );
     }
@@ -986,7 +1082,7 @@
     const hint = document.createElement('div');
     hint.style.cssText = 'margin-top:10px;font-size:11px;color:#777';
     hint.textContent =
-      'Speed limits render as circular road signs (red ring). Blue circle = GPS accuracy. Click a marker for Done / Dismiss.';
+      'Orange arrow = travel direction. Blue disc = GPS accuracy. Click a marker for Done / Dismiss.';
     root.appendChild(hint);
 
     tabPane.appendChild(root);

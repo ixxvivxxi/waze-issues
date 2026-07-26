@@ -44,6 +44,9 @@
     <string name="need_nick">Сначала укажите ник в Настройках</string>
     <string name="queued">В очереди: %1$s</string>
     <string name="wait_until_synced">Дождитесь загрузки, чтобы добавить заметку</string>
+    <string name="tap_to_retry">Не отправлено — нажмите, чтобы повторить</string>
+    <string name="sync_pending_hint">Отправка…</string>
+    <string name="retrying">Повтор: %1$s</string>
     <string name="sent">Отправлено: %1$s</string>
     <string name="send_failed">Ошибка отправки</string>
     <string name="trail_too_short">Траектория слишком короткая для направления</string>

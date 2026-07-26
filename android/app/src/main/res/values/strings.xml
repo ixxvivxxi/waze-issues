@@ -44,6 +44,9 @@
     <string name="need_nick">Set your nick in Settings first</string>
     <string name="queued">Queued: %1$s</string>
     <string name="wait_until_synced">Wait until uploaded to add a note</string>
+    <string name="tap_to_retry">Upload failed — tap to retry</string>
+    <string name="sync_pending_hint">Uploading…</string>
+    <string name="retrying">Retrying: %1$s</string>
     <string name="sent">Sent: %1$s</string>
     <string name="send_failed">Send failed</string>
     <string name="trail_too_short">Trail too short for heading</string>
