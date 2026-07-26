@@ -17,7 +17,6 @@ OUT_APK="$ANDROID_DIR/app/build/outputs/apk/release/app-release.apk"
 PUBLISH=0
 REPO="${GITHUB_REPOSITORY:-ixxvivxxi/waze-issues}"
 APK_RELEASE_TAG="android-latest"
-APK_URL="https://github.com/${REPO}/releases/download/${APK_RELEASE_TAG}/app.apk"
 
 for arg in "$@"; do
   case "$arg" in
@@ -83,12 +82,15 @@ fi
 GRADLE="$ANDROID_DIR/app/build.gradle.kts"
 VERSION_CODE="$(grep -oP 'versionCode\s*=\s*\K[0-9]+' "$GRADLE" | head -1)"
 VERSION_NAME="$(grep -oP 'versionName\s*=\s*"\K[^"]+' "$GRADLE" | head -1)"
+APK_FILE="waze-issues-${VERSION_NAME}.apk"
+APK_URL="https://github.com/${REPO}/releases/download/${APK_RELEASE_TAG}/${APK_FILE}"
 STAGE="$ROOT/publish-apk"
 mkdir -p "$STAGE"
-cp -f "$OUT_APK" "$STAGE/app.apk"
-printf '{"versionCode":%s,"versionName":"%s","apkUrl":"%s"}\n' \
-  "$VERSION_CODE" "$VERSION_NAME" "$APK_URL" > "$STAGE/version.json"
-echo "==> Staged $STAGE/app.apk + version.json (code=$VERSION_CODE name=$VERSION_NAME)"
+cp -f "$OUT_APK" "$STAGE/${APK_FILE}"
+cp -f "$STAGE/${APK_FILE}" "$STAGE/app.apk"
+printf '{"versionCode":%s,"versionName":"%s","apkUrl":"%s","apkFile":"%s"}\n' \
+  "$VERSION_CODE" "$VERSION_NAME" "$APK_URL" "$APK_FILE" > "$STAGE/version.json"
+echo "==> Staged $STAGE/${APK_FILE} (code=$VERSION_CODE)"
 
 if [[ "$PUBLISH" -eq 1 ]]; then
   if ! command -v gh >/dev/null 2>&1; then
@@ -98,33 +100,30 @@ if [[ "$PUBLISH" -eq 1 ]]; then
   VER_TAG="android-v${VERSION_NAME}"
   echo "==> Publishing to GitHub Releases ($REPO)"
   if gh release view "$VER_TAG" --repo "$REPO" >/dev/null 2>&1; then
-    gh release upload "$VER_TAG" "$STAGE/app.apk" "$STAGE/version.json" --repo "$REPO" --clobber
+    gh release upload "$VER_TAG" "$STAGE/${APK_FILE}" "$STAGE/version.json" --repo "$REPO" --clobber
   else
-    gh release create "$VER_TAG" "$STAGE/app.apk" "$STAGE/version.json" --repo "$REPO" \
+    gh release create "$VER_TAG" "$STAGE/${APK_FILE}" "$STAGE/version.json" --repo "$REPO" \
       --title "Android ${VERSION_NAME}" \
-      --notes "Signed release APK ${VERSION_NAME}." \
+      --notes "Signed release APK ${APK_FILE}." \
       --latest=false
   fi
-  if gh release view "$APK_RELEASE_TAG" --repo "$REPO" >/dev/null 2>&1; then
-    gh release upload "$APK_RELEASE_TAG" "$STAGE/app.apk" "$STAGE/version.json" --repo "$REPO" --clobber
-  else
-    gh release create "$APK_RELEASE_TAG" "$STAGE/app.apk" "$STAGE/version.json" --repo "$REPO" \
-      --title "Android (latest)" \
-      --notes "Rolling latest APK + version.json for in-app updates." \
-      --latest=false
-  fi
+  gh release delete "$APK_RELEASE_TAG" --repo "$REPO" --yes || true
+  git -C "$ROOT" push origin ":refs/tags/${APK_RELEASE_TAG}" 2>/dev/null || true
+  gh release create "$APK_RELEASE_TAG" "$STAGE/${APK_FILE}" "$STAGE/version.json" --repo "$REPO" \
+    --title "Android (latest)" \
+    --notes "Rolling latest: ${APK_FILE}" \
+    --latest=false
   echo "==> Live at $APK_URL"
   echo "==> Manifest: https://github.com/${REPO}/releases/download/${APK_RELEASE_TAG}/version.json"
 
-  # Also mirror to VPS so older app builds (checking ster.by/version.json) can upgrade once.
   SSH_HOST="${WAZE_ISSUES_SSH:-myvps}"
   if ssh -o BatchMode=yes -o ConnectTimeout=5 "$SSH_HOST" 'true' 2>/dev/null; then
-    echo "==> Mirroring APK + version.json to VPS ($SSH_HOST)"
-    scp "$STAGE/app.apk" "$STAGE/version.json" \
+    echo "==> Mirroring to VPS ($SSH_HOST)"
+    scp "$STAGE/${APK_FILE}" "$STAGE/app.apk" "$STAGE/version.json" \
       "${SSH_HOST}:~/waze-issues/deploy/public/"
     scp "$ROOT/deploy/public/index.html" \
       "${SSH_HOST}:~/waze-issues/deploy/public/index.html" || true
-    echo "==> Hosting mirror: https://waze-issues.ster.by/app.apk"
+    echo "==> Hosting mirror: https://waze-issues.ster.by/app.apk (+ ${APK_FILE})"
   else
     echo "==> Skip VPS mirror (ssh $SSH_HOST not available)"
   fi

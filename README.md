@@ -9,7 +9,7 @@ Phone → server → database tool for flagging Waze map problems while driving 
 | Deploy | [`deploy/`](deploy/) | Docker Compose on VPS + nginx snippets |
 
 **Production API:** `https://waze-issues.ster.by` (configurable in the app; domain may change)  
-**APK / updates:** [GitHub Releases `android-latest`](https://github.com/ixxvivxxi/waze-issues/releases/tag/android-latest)  
+**APK / updates:** [GitHub Releases `android-latest`](https://github.com/ixxvivxxi/waze-issues/releases/tag/android-latest) (`waze-issues-<version>.apk`)  
 **Userscript:** [raw on GitHub](https://raw.githubusercontent.com/ixxvivxxi/waze-issues/main/wme-waze-issues.user.js)  
 **Image:** `ghcr.io/ixxvivxxi/waze-issues:api`
 

@@ -21,9 +21,8 @@ jobs:
     environment: production
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-      # Rolling GitHub Release tag — stable download URLs for in-app updates.
       APK_RELEASE_TAG: android-latest
-      APK_DOWNLOAD_URL: https://github.com/ixxvivxxi/waze-issues/releases/download/android-latest/app.apk
+      GH_REPO: ixxvivxxi/waze-issues
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -65,13 +64,19 @@ jobs:
           GRADLE=android/app/build.gradle.kts
           CODE="$(grep -oP 'versionCode\s*=\s*\K[0-9]+' "$GRADLE" | head -1)"
           NAME="$(grep -oP 'versionName\s*=\s*"\K[^"]+' "$GRADLE" | head -1)"
+          APK_FILE="waze-issues-${NAME}.apk"
+          APK_URL="https://github.com/${GH_REPO}/releases/download/${APK_RELEASE_TAG}/${APK_FILE}"
           mkdir -p publish
-          cp android/app/build/outputs/apk/release/app-release.apk publish/app.apk
-          printf '{"versionCode":%s,"versionName":"%s","apkUrl":"%s"}\n' \
-            "$CODE" "$NAME" "$APK_DOWNLOAD_URL" > publish/version.json
+          cp android/app/build/outputs/apk/release/app-release.apk "publish/${APK_FILE}"
+          # Compat alias for older install links / nginx /app.apk
+          cp "publish/${APK_FILE}" publish/app.apk
+          printf '{"versionCode":%s,"versionName":"%s","apkUrl":"%s","apkFile":"%s"}\n' \
+            "$CODE" "$NAME" "$APK_URL" "$APK_FILE" > publish/version.json
           cp deploy/public/index.html publish/index.html
           echo "version_code=$CODE" >> "$GITHUB_OUTPUT"
           echo "version_name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "apk_file=$APK_FILE" >> "$GITHUB_OUTPUT"
+          echo "apk_url=$APK_URL" >> "$GITHUB_OUTPUT"
           cat publish/version.json
           ls -la publish/
       - uses: actions/upload-artifact@v4
@@ -79,12 +84,11 @@ jobs:
           name: waze-issues-apk
           path: |
             android/app/build/outputs/apk/release/*.apk
-            publish/app.apk
+            publish/*.apk
             publish/version.json
             android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
-      # Signed builds from main → GitHub Releases (domain-independent).
       - name: Publish to GitHub Releases
         if: >-
           env.HAS_KEYSTORE == 'true' &&
@@ -93,35 +97,33 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION_NAME: ${{ steps.stage.outputs.version_name }}
+          APK_FILE: ${{ steps.stage.outputs.apk_file }}
+          APK_URL: ${{ steps.stage.outputs.apk_url }}
         run: |
           set -euo pipefail
           VER_TAG="android-v${VERSION_NAME}"
 
-          # Immutable-ish per-version release (history).
           if gh release view "$VER_TAG" >/dev/null 2>&1; then
-            gh release upload "$VER_TAG" publish/app.apk publish/version.json --clobber
+            gh release upload "$VER_TAG" "publish/${APK_FILE}" publish/version.json --clobber
           else
-            gh release create "$VER_TAG" publish/app.apk publish/version.json \
+            gh release create "$VER_TAG" "publish/${APK_FILE}" publish/version.json \
               --title "Android ${VERSION_NAME}" \
-              --notes "Signed release APK ${VERSION_NAME}." \
+              --notes "Signed release APK ${APK_FILE}." \
               --latest=false
           fi
 
-          # Rolling tag used by the app for update checks.
-          if gh release view "$APK_RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$APK_RELEASE_TAG" publish/app.apk publish/version.json --clobber
-          else
-            gh release create "$APK_RELEASE_TAG" publish/app.apk publish/version.json \
-              --title "Android (latest)" \
-              --notes "Rolling latest APK + version.json for in-app updates." \
-              --latest=false
-          fi
+          # Recreate rolling tag so only the current versioned APK remains.
+          gh release delete "$APK_RELEASE_TAG" --yes || true
+          git push origin ":refs/tags/${APK_RELEASE_TAG}" || true
+          gh release create "$APK_RELEASE_TAG" "publish/${APK_FILE}" publish/version.json \
+            --title "Android (latest)" \
+            --notes "Rolling latest: ${APK_FILE}" \
+            --latest=false
 
           echo "APK_PUBLISHED"
-          echo "manifest: https://github.com/ixxvivxxi/waze-issues/releases/download/${APK_RELEASE_TAG}/version.json"
-          echo "apk:      $APK_DOWNLOAD_URL"
+          echo "manifest: https://github.com/${GH_REPO}/releases/download/${APK_RELEASE_TAG}/version.json"
+          echo "apk:      ${APK_URL}"
 
-      # Transition mirror: older installs still poll the VPS for version.json.
       - name: Mirror APK to VPS
         if: >-
           env.HAS_KEYSTORE == 'true' &&
@@ -132,7 +134,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: publish/app.apk,publish/version.json,publish/index.html
+          source: publish/*
           target: /home/${{ secrets.DEPLOY_USER }}/waze-issues/deploy/public
           strip_components: 1
       - name: Confirm VPS mirror
@@ -148,6 +150,6 @@ jobs:
           script: |
             set -euo pipefail
             cd ~/waze-issues/deploy/public
-            ls -la app.apk version.json index.html
+            ls -la waze-issues-*.apk app.apk version.json index.html
             cat version.json
             echo "VPS_MIRROR_OK"

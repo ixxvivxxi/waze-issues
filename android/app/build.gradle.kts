@@ -20,8 +20,8 @@ android {
         applicationId = "by.ster.wazeissues"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.3.7"
+        versionCode = 11
+        versionName = "0.3.8"
         buildConfigField("String", "DEFAULT_API_BASE", "\"https://waze-issues.ster.by\"")
         // APK updates live on GitHub Releases (not tied to the API domain).
         buildConfigField(
@@ -32,7 +32,7 @@ android {
         buildConfigField(
             "String",
             "DEFAULT_APK_URL",
-            "\"https://github.com/ixxvivxxi/waze-issues/releases/download/android-latest/app.apk\"",
+            "\"https://github.com/ixxvivxxi/waze-issues/releases/download/android-latest/waze-issues-0.3.8.apk\"",
         )
     }
 
