@@ -2,6 +2,7 @@ name: Build Android APK
 
 on:
   push:
+    branches: [main]
     paths:
       - 'android/**'
       - '.github/workflows/build-android.yml'
@@ -14,6 +15,7 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    environment: production
     env:
       HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
@@ -56,3 +58,34 @@ jobs:
             android/app/build/outputs/apk/release/*.apk
             android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+
+      # Only signed release builds from main are published for download.
+      - name: Publish APK to VPS
+        if: >-
+          env.HAS_KEYSTORE == 'true' &&
+          github.event_name != 'pull_request' &&
+          github.ref == 'refs/heads/main'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: android/app/build/outputs/apk/release/app-release.apk
+          target: /home/${{ secrets.DEPLOY_USER }}/waze-issues/deploy/public
+          strip_components: 6
+      - name: Rename published APK
+        if: >-
+          env.HAS_KEYSTORE == 'true' &&
+          github.event_name != 'pull_request' &&
+          github.ref == 'refs/heads/main'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd ~/waze-issues/deploy/public
+            mv -f app-release.apk app.apk
+            ls -la app.apk
+            echo "APK_PUBLISHED"

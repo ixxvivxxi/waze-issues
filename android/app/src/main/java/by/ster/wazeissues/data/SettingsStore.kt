@@ -12,11 +12,9 @@ private val Context.dataStore by preferencesDataStore("settings")
 
 class SettingsStore(private val context: Context) {
     private val nickKey = stringPreferencesKey("nick")
-    private val apiKeyKey = stringPreferencesKey("api_key")
     private val apiBaseKey = stringPreferencesKey("api_base")
 
     val nick: Flow<String> = context.dataStore.data.map { it[nickKey].orEmpty() }
-    val apiKey: Flow<String> = context.dataStore.data.map { it[apiKeyKey].orEmpty() }
     val apiBase: Flow<String> =
         context.dataStore.data.map {
             it[apiBaseKey]?.takeIf { v -> v.isNotBlank() } ?: BuildConfig.DEFAULT_API_BASE
@@ -24,10 +22,6 @@ class SettingsStore(private val context: Context) {
 
     suspend fun setNick(value: String) {
         context.dataStore.edit { it[nickKey] = value.trim() }
-    }
-
-    suspend fun setApiKey(value: String) {
-        context.dataStore.edit { it[apiKeyKey] = value.trim() }
     }
 
     suspend fun setApiBase(value: String) {

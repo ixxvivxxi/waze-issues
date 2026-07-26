@@ -25,7 +25,6 @@ data class ReportRemote(
 
 class ApiClient(
     private val baseUrlProvider: () -> String,
-    private val apiKeyProvider: () -> String,
 ) {
     private val client =
         OkHttpClient.Builder()
@@ -58,7 +57,6 @@ class ApiClient(
         val req =
             Request.Builder()
                 .url("${baseUrlProvider().trimEnd('/')}/api/reports")
-                .header("X-Api-Key", apiKeyProvider())
                 .post(body.toString().toRequestBody(jsonMedia))
                 .build()
         return parseReport(execute(req))
@@ -74,7 +72,6 @@ class ApiClient(
         val req =
             Request.Builder()
                 .url("${baseUrlProvider().trimEnd('/')}/api/reports/$id/trajectory")
-                .header("X-Api-Key", apiKeyProvider())
                 .patch(body.toString().toRequestBody(jsonMedia))
                 .build()
         return parseReport(execute(req))
@@ -85,7 +82,6 @@ class ApiClient(
         val req =
             Request.Builder()
                 .url("${baseUrlProvider().trimEnd('/')}/api/reports/$id")
-                .header("X-Api-Key", apiKeyProvider())
                 .patch(body.toString().toRequestBody(jsonMedia))
                 .build()
         return parseReport(execute(req))

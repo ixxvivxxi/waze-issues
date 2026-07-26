@@ -15,7 +15,6 @@
     <string name="add_note">Добавить заметку</string>
     <string name="description">Описание</string>
     <string name="nick_label">Ник (виден редакторам)</string>
-    <string name="api_key_label">API-ключ</string>
     <string name="api_base_label">Базовый URL API</string>
     <string name="tap_to_add_note">Нажмите, чтобы добавить заметку</string>
     <string name="status_idle">Нажмите, чтобы отметить · ник: %1$s</string>
@@ -24,7 +23,7 @@
     <string name="gps_searching">GPS: поиск…</string>
     <string name="gps_accuracy">Точность GPS: ±%1$d м</string>
     <string name="gps_stale">GPS устарел (±%1$d м) — подождите</string>
-    <string name="settings_required_hint">Укажите ник и API-ключ, чтобы продолжить</string>
+    <string name="settings_required_hint">Укажите ник, чтобы продолжить</string>
     <string name="queued_with_accuracy">В очереди: %1$s (±%2$d м)</string>
 
     <string name="bump_add">Добавить</string>
@@ -43,7 +42,6 @@
     <string name="note_saved">Заметка сохранена</string>
     <string name="note_save_failed">Не удалось сохранить заметку</string>
     <string name="need_nick">Сначала укажите ник в Настройках</string>
-    <string name="need_api_key">Сначала укажите API-ключ в Настройках</string>
     <string name="queued">В очереди: %1$s</string>
     <string name="wait_until_synced">Дождитесь загрузки, чтобы добавить заметку</string>
     <string name="sent">Отправлено: %1$s</string>

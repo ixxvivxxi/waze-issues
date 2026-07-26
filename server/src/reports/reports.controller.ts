@@ -7,9 +7,7 @@ import {
   Patch,
   Post,
   Query,
-  UseGuards,
 } from '@nestjs/common';
-import { ApiKeyGuard } from '../common/api-key.guard';
 import {
   CreateReportDto,
   TrajectoryDto,
@@ -18,7 +16,6 @@ import {
 import { ReportsService } from './reports.service';
 
 @Controller('api/reports')
-@UseGuards(ApiKeyGuard)
 export class ReportsController {
   constructor(private readonly reports: ReportsService) {}
 

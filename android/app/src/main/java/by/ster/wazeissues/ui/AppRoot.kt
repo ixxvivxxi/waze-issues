@@ -477,7 +477,6 @@ private fun SpeedLimitEndButton(
 @Composable
 private fun SettingsScreen(state: UiState, vm: MainViewModel) {
     var nick by remember(state.nick) { mutableStateOf(state.nick) }
-    var apiKey by remember(state.apiKey) { mutableStateOf(state.apiKey) }
     var apiBase by remember(state.apiBase) { mutableStateOf(state.apiBase) }
     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.settings), style = MaterialTheme.typography.titleLarge)
@@ -516,13 +515,6 @@ private fun SettingsScreen(state: UiState, vm: MainViewModel) {
             modifier = Modifier.fillMaxWidth(),
         )
         OutlinedTextField(
-            value = apiKey,
-            onValueChange = { apiKey = it },
-            label = { Text(stringResource(R.string.api_key_label)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        OutlinedTextField(
             value = apiBase,
             onValueChange = { apiBase = it },
             label = { Text(stringResource(R.string.api_base_label)) },
@@ -530,7 +522,7 @@ private fun SettingsScreen(state: UiState, vm: MainViewModel) {
             modifier = Modifier.fillMaxWidth(),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { vm.saveSettings(nick, apiKey, apiBase) }) {
+            Button(onClick = { vm.saveSettings(nick, apiBase) }) {
                 Text(stringResource(R.string.save))
             }
             if (state.settingsReady) {

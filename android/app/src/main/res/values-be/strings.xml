@@ -15,7 +15,6 @@
     <string name="add_note">Дадаць нататку</string>
     <string name="description">Апісанне</string>
     <string name="nick_label">Нік (бачны рэдактарам)</string>
-    <string name="api_key_label">API-ключ</string>
     <string name="api_base_label">Базавы URL API</string>
     <string name="tap_to_add_note">Націсніце, каб дадаць нататку</string>
     <string name="status_idle">Націсніце, каб адзначыць · нік: %1$s</string>
@@ -24,7 +23,7 @@
     <string name="gps_searching">GPS: пошук…</string>
     <string name="gps_accuracy">Дакладнасць GPS: ±%1$d м</string>
     <string name="gps_stale">GPS састарэў (±%1$d м) — пачакайце</string>
-    <string name="settings_required_hint">Укажыце нік і API-ключ, каб працягнуць</string>
+    <string name="settings_required_hint">Укажыце нік, каб працягнуць</string>
     <string name="queued_with_accuracy">У чарзе: %1$s (±%2$d м)</string>
 
     <string name="bump_add">Дадаць</string>
@@ -43,7 +42,6 @@
     <string name="note_saved">Нататка захавана</string>
     <string name="note_save_failed">Не ўдалося захаваць нататку</string>
     <string name="need_nick">Спачатку пазначце нік у Наладах</string>
-    <string name="need_api_key">Спачатку пазначце API-ключ у Наладах</string>
     <string name="queued">У чарзе: %1$s</string>
     <string name="wait_until_synced">Дачакайцеся загрузкі, каб дадаць нататку</string>
     <string name="sent">Адпраўлена: %1$s</string>

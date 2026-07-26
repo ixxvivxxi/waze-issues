@@ -15,7 +15,6 @@
     <string name="add_note">Add note</string>
     <string name="description">Description</string>
     <string name="nick_label">Nick (shown to editors)</string>
-    <string name="api_key_label">API key</string>
     <string name="api_base_label">API base URL</string>
     <string name="tap_to_add_note">Tap to add note</string>
     <string name="status_idle">Tap to report · nick: %1$s</string>
@@ -24,7 +23,7 @@
     <string name="gps_searching">GPS: searching…</string>
     <string name="gps_accuracy">GPS accuracy: ±%1$d m</string>
     <string name="gps_stale">GPS stale (±%1$d m) — wait for fix</string>
-    <string name="settings_required_hint">Enter nick and API key to continue</string>
+    <string name="settings_required_hint">Enter your nick to continue</string>
     <string name="queued_with_accuracy">Queued: %1$s (±%2$d m)</string>
 
     <string name="bump_add">Add</string>
@@ -43,7 +42,6 @@
     <string name="note_saved">Note saved</string>
     <string name="note_save_failed">Failed to save note</string>
     <string name="need_nick">Set your nick in Settings first</string>
-    <string name="need_api_key">Set API key in Settings first</string>
     <string name="queued">Queued: %1$s</string>
     <string name="wait_until_synced">Wait until uploaded to add a note</string>
     <string name="sent">Sent: %1$s</string>

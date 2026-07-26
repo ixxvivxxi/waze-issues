@@ -1,6 +1,6 @@
 # Waze Issues
 
-Phone → server → database tool for flagging Waze map problems while driving (speed bumps, speed limits). Review in WME comes later via a userscript.
+Phone → server → database tool for flagging Waze map problems while driving (speed bumps, speed limits). Review in WME via a userscript.
 
 | Piece | Path | Role |
 |-------|------|------|
@@ -9,9 +9,10 @@ Phone → server → database tool for flagging Waze map problems while driving 
 | Deploy | [`deploy/`](deploy/) | Docker Compose on VPS + nginx snippets |
 
 **Production:** `https://waze-issues.ster.by` (Let's Encrypt)  
-**APK:** `https://waze-issues.ster.by/app.apk`
+**APK:** `https://waze-issues.ster.by/app.apk`  
+**Image:** `ghcr.io/ixxvivxxi/waze-issues:api`
 
-## API (requires `X-Api-Key`)
+## API (open for trusted users — no API key)
 
 - `POST /api/reports` — create (`issueType`, `lon`, `lat`, `reporterNick`, optional `payload.valueKmh`, `clientEventId`)
 - `PATCH /api/reports/:id/trajectory` — `{ points: [{lon,lat},…], headingDeg? }`
@@ -27,99 +28,75 @@ Shared Postgres on the VPS has **no PostGIS**; coordinates are `lon`/`lat` doubl
 
 ```bash
 cd server
-cp .env.example .env   # set DATABASE_URL + API_KEY
+cp .env.example .env   # set DATABASE_URL
 npm install
 npm run migration:run
 npm run start:dev
 ```
 
-## Manual deploy (first time / until GHA secrets exist)
+## Deploy (GitHub Actions → GHCR → VPS)
 
-On the VPS as `ster` (SSH host `myvps`):
+On push to `main` (server/deploy paths) or `workflow_dispatch`:
 
-1. Create DB on shared `main-postgres` (once):
+1. Build & push `ghcr.io/ixxvivxxi/waze-issues:api` (+ `:api-<sha>`)
+2. SSH to VPS → `~/waze-issues/deploy/./deploy.sh` (pull + up)
+
+### GitHub secrets (Environment `production`)
+
+| Secret | Purpose |
+|--------|---------|
+| `DEPLOY_HOST` | VPS host (e.g. `95.128.71.94` or `myvps` hostname) |
+| `DEPLOY_USER` | SSH user (`ster`) |
+| `DEPLOY_SSH_KEY` | Private SSH key PEM for that user |
+
+`GITHUB_TOKEN` is built-in (`packages: write`) — no custom registry password needed.
+
+### One-time VPS setup
+
+1. Create DB on shared `main-postgres` (once).
+2. Keep a thin checkout at `~/waze-issues` with at least `deploy/` (compose + `deploy.sh` + `public/`).
+3. `cp deploy/.env.prod.example deploy/.env.prod` and set `DATABASE_URL`. Remove any old `API_KEY`. Set:
 
 ```bash
-docker exec -e PGPASSWORD=… main-postgres \
-  psql -U ster -d postgres -c "CREATE USER waze_issues WITH PASSWORD '…';"
-docker exec -e PGPASSWORD=… main-postgres \
-  psql -U ster -d postgres -c "CREATE DATABASE waze_issues OWNER waze_issues;"
+WAZE_ISSUES_IMAGE=ghcr.io/ixxvivxxi/waze-issues:api
 ```
 
-2. Sync this repo to `~/waze-issues`, fill `deploy/.env.prod` from `.env.prod.example`.
-
-3. `cd ~/waze-issues/deploy && chmod +x deploy.sh && ./deploy.sh`
-
-4. Host nginx + Let's Encrypt for `waze-issues.ster.by` (proxy to local `8095`/`8096`):
+4. If the GHCR package is **private**, once on the VPS:
 
 ```bash
-# writes /etc/nginx/sites-available/waze-issues and runs certbot --nginx
-~/waze-issues/deploy/install-nginx.sh
+echo "$GHCR_TOKEN" | docker login ghcr.io -u ixxvivxxi --password-stdin
 ```
 
-5. Copy APK to `deploy/public/app.apk`.
+(Or make the package public in GitHub → Packages.)
 
-Compose binds API/static on **127.0.0.1 only**; public access is via nginx on 443.
+5. Host nginx + Let's Encrypt for `waze-issues.ster.by` (proxy to `8095`/`8096`).
+
+Manual deploy: `cd ~/waze-issues/deploy && ./deploy.sh`
 
 ## Android
 
-Default API base in the APK is `https://waze-issues.ster.by` (see `android/app/build.gradle.kts` → `DEFAULT_API_BASE`).
-
-In the app: **Settings** → nick + API key (same as server `API_KEY` in `deploy/.env.prod`). Use split-screen with Waze.
-
-### Build APK (Docker — recommended on this machine)
-
-Signed **release** APK (same key every time → phone can update without uninstall).
-
-First-time signing setup (already done on this machine; keep a backup of `android/signing/`):
+Default API base: `https://waze-issues.ster.by`. **Settings** → nick (+ optional API base). Use split-screen with Waze.
 
 ```bash
-chmod +x android/signing/create-keystore.sh
-./android/signing/create-keystore.sh
+./android/build-apk.sh            # release APK → deploy/public/app.apk
+./android/build-apk.sh --publish  # also scp to VPS
 ```
 
-Build / publish:
-
-```bash
-chmod +x android/build-apk.sh
-./android/build-apk.sh            # → android/.../apk/release/app-release.apk
-                                  # and deploy/public/app.apk
-./android/build-apk.sh --publish  # also scp to VPS (SSH host myvps)
-```
-
-`versionCode` in `android/app/build.gradle.kts` must increase on each published build, or Android will refuse the update.
-
-**Play Protect / “App blocked”:** sideloaded APKs (not from Play Store) can still show a warning — tap **Install anyway**. A release signature reduces false positives vs debug builds, but only Play Store distribution removes the warning fully.
-
-**One-time reinstall:** the first release-signed APK cannot update over old debug builds (different signature). Uninstall once, then install; later updates overwrite in place.
-
-| Item | Value |
-|------|-------|
-| Repo | `/home/anton/projects/waze-issues` (GitHub `ixxvivxxi/waze-issues`) |
-| SDK cache | `~/.android-sdk-docker` (reuse across builds; first run is slow) |
-| Docker image | `eclipse-temurin:17-jdk` |
-| Gradle | `android/gradlew assembleRelease` (signed) |
-| Signing | `android/signing/` (gitignored keystore — back it up) |
-| Publish SSH | host `myvps` → user `ster` |
-| Live APK URL | `https://waze-issues.ster.by/app.apk` |
-| CI | `.github/workflows/build-android.yml` — release if keystore secrets set, else debug |
+Bump `versionCode` in `android/app/build.gradle.kts` on each published build.
 
 ## WME userscript
 
-Install [`wme-waze-issues.user.js`](wme-waze-issues.user.js) in Tampermonkey (also mirrored in [wme-scripts](https://github.com/ixxvivxxi/wme-scripts)).
+Install [`wme-waze-issues.user.js`](wme-waze-issues.user.js) in Tampermonkey.
 
-1. Open WME → sidebar tab **Drive reports**
-2. Paste API key, leave API base `https://waze-issues.ster.by`
+1. Open WME → sidebar **Drive reports**
+2. API base `https://waze-issues.ster.by`
 3. Enable **Show pending reports** (zoom 14+)
-4. Speed limits draw as circular road signs (red ring + number); bumps as yellow diamonds
-5. Click a marker → **Done** / **Dismiss**
+4. Click a marker → **Done** / **Dismiss**
 
 ## GitHub Actions
 
-- [`build-server.yml`](.github/workflows/build-server.yml) — `docker build` only
-- [`build-android.yml`](.github/workflows/build-android.yml) — release APK when keystore secrets exist, otherwise debug artifact
-
-**Deploy workflow is deferred** until SSH/registry secrets can be added.
+- [`deploy.yml`](.github/workflows/deploy.yml) — build/push API image to GHCR + SSH deploy
+- [`build-android.yml`](.github/workflows/build-android.yml) — APK artifact
 
 ## License
 

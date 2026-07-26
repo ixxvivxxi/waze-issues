@@ -3,7 +3,7 @@
 // @description     Show driving map reports from waze-issues.ster.by: speed-limit road signs and speed-bump markers; Done / Dismiss.
 // @namespace       https://github.com/ixxvivxxi/wme-scripts
 // @homepageURL     https://github.com/ixxvivxxi/waze-issues
-// @version         2026.07.25.002
+// @version         2026.07.26.001
 // @match           https://www.waze.com/*/editor*
 // @match           https://www.waze.com/editor*
 // @match           https://beta.waze.com/*/editor*
@@ -26,7 +26,6 @@
   const SCRIPT_ID = 'wme-waze-issues';
   const SCRIPT_NAME = 'Drive reports';
   const STORAGE_API_BASE = 'wmeWazeIssues_apiBase';
-  const STORAGE_API_KEY = 'wmeWazeIssues_apiKey';
   const STORAGE_FOLLOW = 'wmeWazeIssues_followMap';
   const DEFAULT_API_BASE = 'https://waze-issues.ster.by';
   const MIN_ZOOM = 14;
@@ -36,7 +35,6 @@
   let sdk = null;
   let statusEl = null;
   let apiBaseEl = null;
-  let apiKeyEl = null;
   let followEl = null;
   let popupEl = null;
   let ol2Layer = null;
@@ -102,15 +100,10 @@
     return v.replace(/\/+$/, '');
   }
 
-  function apiKey() {
-    return ((apiKeyEl && apiKeyEl.value) || storageGet(STORAGE_API_KEY, '')).trim();
-  }
-
   function httpJson(method, url, bodyObj) {
     return new Promise(function (resolve, reject) {
       const headers = {
         Accept: 'application/json',
-        'X-Api-Key': apiKey(),
       };
       let data = undefined;
       if (bodyObj != null) {
@@ -745,10 +738,6 @@
       setStatus('Layer off');
       return;
     }
-    if (!apiKey()) {
-      setStatus('Set API key in the Drive reports tab');
-      return;
-    }
     const z = getZoom();
     if (z == null || z < MIN_ZOOM) {
       clearLayers();
@@ -776,7 +765,6 @@
     setStatus('Loading…');
     try {
       storageSet(STORAGE_API_BASE, apiBase());
-      storageSet(STORAGE_API_KEY, apiKey());
       const reports = await fetchReports(bbox);
       applyReports(reports);
       lastViewportKey = key;
@@ -886,22 +874,6 @@
       debouncedLoad();
     });
     root.appendChild(apiBaseEl);
-
-    const keyLbl = document.createElement('div');
-    keyLbl.style.cssText = 'margin-top:8px;font-size:12px;color:#555';
-    keyLbl.textContent = 'API key';
-    root.appendChild(keyLbl);
-    apiKeyEl = document.createElement('input');
-    apiKeyEl.type = 'password';
-    apiKeyEl.value = storageGet(STORAGE_API_KEY, '');
-    apiKeyEl.placeholder = 'X-Api-Key';
-    apiKeyEl.style.cssText = 'width:100%;box-sizing:border-box;margin-top:2px';
-    apiKeyEl.addEventListener('change', function () {
-      storageSet(STORAGE_API_KEY, apiKey());
-      lastViewportKey = '';
-      debouncedLoad();
-    });
-    root.appendChild(apiKeyEl);
 
     const reload = document.createElement('button');
     reload.type = 'button';

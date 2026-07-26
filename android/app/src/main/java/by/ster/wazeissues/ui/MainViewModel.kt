@@ -48,7 +48,6 @@ data class RecentItem(
 
 data class UiState(
     val nick: String = "",
-    val apiKey: String = "",
     val apiBase: String = "",
     val settingsReady: Boolean = false,
     val settingsLoaded: Boolean = false,
@@ -73,7 +72,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val api =
         ApiClient(
             baseUrlProvider = { _state.value.apiBase },
-            apiKeyProvider = { _state.value.apiKey },
         )
 
     private fun str(resId: Int): String = getApplication<Application>().getString(resId)
@@ -85,14 +83,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         LiveLocation.start(app)
         _state.update { it.copy(language = AppLocales.currentTag()) }
         viewModelScope.launch {
-            combine(settings.nick, settings.apiKey, settings.apiBase) { nick, key, base ->
-                Triple(nick, key, base)
-            }.collect { (nick, key, base) ->
-                val ready = nick.isNotBlank() && key.isNotBlank()
+            combine(settings.nick, settings.apiBase) { nick, base ->
+                nick to base
+            }.collect { (nick, base) ->
+                val ready = nick.isNotBlank()
                 _state.update { s ->
                     s.copy(
                         nick = nick,
-                        apiKey = key,
                         apiBase = base,
                         settingsReady = ready,
                         settingsLoaded = true,
@@ -137,20 +134,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(language = tag) }
     }
 
-    fun saveSettings(nick: String, apiKey: String, apiBase: String) {
+    fun saveSettings(nick: String, apiBase: String) {
         val n = nick.trim()
-        val k = apiKey.trim()
         if (n.isBlank()) {
             _state.update { it.copy(statusMessage = str(R.string.need_nick), showSettings = true) }
             return
         }
-        if (k.isBlank()) {
-            _state.update { it.copy(statusMessage = str(R.string.need_api_key), showSettings = true) }
-            return
-        }
         viewModelScope.launch {
             settings.setNick(n)
-            settings.setApiKey(k)
             settings.setApiBase(apiBase)
             _state.update {
                 it.copy(
@@ -158,7 +149,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     settingsReady = true,
                     statusMessage = str(R.string.settings_saved),
                     nick = n,
-                    apiKey = k,
                     apiBase = apiBase.trim().trimEnd('/'),
                 )
             }

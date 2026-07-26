@@ -36,7 +36,6 @@ async function bootstrap() {
     methods: ['GET', 'HEAD', 'POST', 'PATCH', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
-      'X-Api-Key',
       'Access-Control-Request-Private-Network',
     ],
     maxAge: 86400,

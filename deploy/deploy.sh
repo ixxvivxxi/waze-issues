@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Run on the VPS from ~/waze-issues (after syncing this repo).
+# Pull the GHCR API image and recreate the stack.
+# Run on the VPS from ~/waze-issues/deploy (also called by GitHub Actions).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -8,12 +9,14 @@ if [[ ! -f .env.prod ]]; then
   exit 1
 fi
 
-echo "==> Build API image"
-docker compose -f docker-compose.prod.yml --env-file .env.prod build api
+dc() { docker compose -f docker-compose.prod.yml --env-file .env.prod "$@"; }
+
+echo "==> Pull API image"
+dc pull api
 
 echo "==> Recreate stack"
-docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans
+dc up -d --remove-orphans
 
 echo "==> Status"
-docker compose -f docker-compose.prod.yml --env-file .env.prod ps
+dc ps
 echo "DEPLOY_OK"
