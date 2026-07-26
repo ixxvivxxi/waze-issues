@@ -69,6 +69,7 @@ jobs:
           cp android/app/build/outputs/apk/release/app-release.apk publish/app.apk
           printf '{"versionCode":%s,"versionName":"%s","apkUrl":"%s"}\n' \
             "$CODE" "$NAME" "$APK_DOWNLOAD_URL" > publish/version.json
+          cp deploy/public/index.html publish/index.html
           echo "version_code=$CODE" >> "$GITHUB_OUTPUT"
           echo "version_name=$NAME" >> "$GITHUB_OUTPUT"
           cat publish/version.json
@@ -131,7 +132,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: publish/app.apk,publish/version.json,deploy/public/index.html
+          source: publish/app.apk,publish/version.json,publish/index.html
           target: /home/${{ secrets.DEPLOY_USER }}/waze-issues/deploy/public
           strip_components: 1
       - name: Confirm VPS mirror
@@ -147,8 +148,6 @@ jobs:
           script: |
             set -euo pipefail
             cd ~/waze-issues/deploy/public
-            # index.html may land as public/public/index.html depending on strip — normalize
-            if [[ -f public/index.html ]]; then mv -f public/index.html index.html; rmdir public 2>/dev/null || true; fi
             ls -la app.apk version.json index.html
             cat version.json
             echo "VPS_MIRROR_OK"
