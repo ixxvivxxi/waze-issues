@@ -73,6 +73,17 @@ jobs:
           if-no-files-found: error
 
       # Only signed release builds from main are published for download.
+      - name: Stage files for publish
+        if: >-
+          env.HAS_KEYSTORE == 'true' &&
+          github.event_name != 'pull_request' &&
+          github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          mkdir -p publish
+          cp android/app/build/outputs/apk/release/app-release.apk publish/app.apk
+          cp android/app/build/outputs/apk/release/version.json publish/version.json
+          ls -la publish/
       - name: Publish APK to VPS
         if: >-
           env.HAS_KEYSTORE == 'true' &&
@@ -83,12 +94,10 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: |
-            android/app/build/outputs/apk/release/app-release.apk
-            android/app/build/outputs/apk/release/version.json
+          source: publish/app.apk,publish/version.json
           target: /home/${{ secrets.DEPLOY_USER }}/waze-issues/deploy/public
-          strip_components: 6
-      - name: Rename published APK
+          strip_components: 1
+      - name: Confirm published APK
         if: >-
           env.HAS_KEYSTORE == 'true' &&
           github.event_name != 'pull_request' &&
@@ -101,6 +110,6 @@ jobs:
           script: |
             set -euo pipefail
             cd ~/waze-issues/deploy/public
-            mv -f app-release.apk app.apk
-            ls -la app.apk
+            ls -la app.apk version.json
+            cat version.json
             echo "APK_PUBLISHED"
