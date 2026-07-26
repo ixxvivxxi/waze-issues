@@ -50,4 +50,8 @@
     <string name="direction_saved">Направление сохранено (%1$d°)</string>
     <string name="trail_upload_failed">Не удалось отправить траекторию: %1$s</string>
     <string name="no_gps">Нет GPS — подождите немного и попробуйте снова</string>
+
+    <string name="update_available">Доступна новая версия: %1$s</string>
+    <string name="update_download">Обновить</string>
+    <string name="update_later">Позже</string>
 </resources>

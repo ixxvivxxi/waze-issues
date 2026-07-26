@@ -11,6 +11,7 @@ import android.os.VibratorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import by.ster.wazeissues.AppLocales
+import by.ster.wazeissues.BuildConfig
 import by.ster.wazeissues.R
 import by.ster.wazeissues.data.ApiClient
 import by.ster.wazeissues.data.LonLat
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -46,6 +48,11 @@ data class RecentItem(
     val syncStatus: SyncStatus = SyncStatus.Synced,
 )
 
+data class UpdateInfo(
+    val versionName: String,
+    val apkUrl: String,
+)
+
 data class UiState(
     val nick: String = "",
     val apiBase: String = "",
@@ -62,6 +69,8 @@ data class UiState(
     val gpsAgeMs: Long? = null,
     val hasFreshGps: Boolean = false,
     val language: String = AppLocales.EN,
+    /** Set when a newer APK is published on the server. */
+    val updateAvailable: UpdateInfo? = null,
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -115,6 +124,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         TrailBus.onFinished = { id, points ->
             viewModelScope.launch { uploadTrajectory(id, points) }
         }
+        viewModelScope.launch {
+            val base = settings.apiBase.first()
+            checkForUpdate(base)
+        }
+    }
+
+    private suspend fun checkForUpdate(base: String) {
+        if (base.isBlank()) return
+        val latest = withContext(Dispatchers.IO) { api.fetchLatestVersion(base) } ?: return
+        if (latest.versionCode > BuildConfig.VERSION_CODE) {
+            _state.update {
+                it.copy(updateAvailable = UpdateInfo(latest.versionName, latest.apkUrl))
+            }
+        }
+    }
+
+    fun dismissUpdate() {
+        _state.update { it.copy(updateAvailable = null) }
     }
 
     override fun onCleared() {

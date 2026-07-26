@@ -3,7 +3,7 @@
 // @description     Show driving map reports from waze-issues.ster.by: speed-limit road signs and speed-bump markers; Done / Dismiss.
 // @namespace       https://github.com/ixxvivxxi/wme-scripts
 // @homepageURL     https://github.com/ixxvivxxi/waze-issues
-// @version         2026.07.26.001
+// @version         2026.07.26.002
 // @match           https://www.waze.com/*/editor*
 // @match           https://www.waze.com/editor*
 // @match           https://beta.waze.com/*/editor*
@@ -31,6 +31,9 @@
   const MIN_ZOOM = 14;
   const ICON_PX = 36;
   const MAX_BBOX_SPAN_DEG = 0.34;
+  const ACC_FILL = 'rgba(21, 101, 192, 0.14)';
+  const ACC_STROKE = 'rgba(21, 101, 192, 0.55)';
+  const ACC_RING_POINTS = 48;
 
   let sdk = null;
   let statusEl = null;
@@ -38,6 +41,7 @@
   let followEl = null;
   let popupEl = null;
   let ol2Layer = null;
+  let ol2AccLayer = null;
   let ol6Layer = null;
   let cachedOl6 = null;
   let lastViewportKey = '';
@@ -326,6 +330,36 @@
     return r.issueType || 'Issue';
   }
 
+  function accuracyMeters(r) {
+    const acc = r && r.payload && r.payload.accuracyM;
+    const n = Number(acc);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  /** WGS84 ring around (lon,lat) with geodesic radius in meters. */
+  function accuracyRingLonLat(lon, lat, radiusM) {
+    const R = 6378137;
+    const lat1 = (lat * Math.PI) / 180;
+    const lon1 = (lon * Math.PI) / 180;
+    const ang = radiusM / R;
+    const ring = [];
+    for (let i = 0; i <= ACC_RING_POINTS; i++) {
+      const brng = (i * 2 * Math.PI) / ACC_RING_POINTS;
+      const lat2 = Math.asin(
+        Math.sin(lat1) * Math.cos(ang) +
+          Math.cos(lat1) * Math.sin(ang) * Math.cos(brng),
+      );
+      const lon2 =
+        lon1 +
+        Math.atan2(
+          Math.sin(brng) * Math.sin(ang) * Math.cos(lat1),
+          Math.cos(ang) - Math.sin(lat1) * Math.sin(lat2),
+        );
+      ring.push([(lon2 * 180) / Math.PI, (lat2 * 180) / Math.PI]);
+    }
+    return ring;
+  }
+
   function packBBox(minLon, minLat, maxLon, maxLat) {
     const a = Math.min(minLon, maxLon);
     const b = Math.min(minLat, maxLat);
@@ -416,6 +450,21 @@
   function ensureOl2Layer(olm) {
     if (ol2Layer || typeof OpenLayers === 'undefined') return;
     try {
+      ol2AccLayer = new OpenLayers.Layer.Vector(SCRIPT_ID + '-accuracy', {
+        styleMap: new OpenLayers.StyleMap(
+          new OpenLayers.Style({
+            fillColor: '#1565c0',
+            fillOpacity: 0.14,
+            strokeColor: '#1565c0',
+            strokeOpacity: 0.55,
+            strokeWidth: 1,
+          }),
+        ),
+        renderers: ['Canvas', 'SVG', 'VML'],
+        displayInLayerSwitcher: false,
+      });
+      olm.addLayer(ol2AccLayer);
+
       const style = new OpenLayers.Style({
         externalGraphic: '${iconUrl}',
         graphicWidth: ICON_PX,
@@ -453,6 +502,7 @@
     } catch (e) {
       console.warn('[Drive reports] OL2 layer:', e);
       ol2Layer = null;
+      ol2AccLayer = null;
     }
   }
 
@@ -481,6 +531,12 @@
         source: src,
         zIndex: 900,
         style: function (feature) {
+          if (feature.get('kind') === 'accuracy') {
+            return new ol.style.Style({
+              fill: new ol.style.Fill({ color: ACC_FILL }),
+              stroke: new ol.style.Stroke({ color: ACC_STROKE, width: 1 }),
+            });
+          }
           const url = feature.get('iconUrl');
           const heading = feature.get('headingDeg');
           const styles = [
@@ -534,6 +590,9 @@
       if (ol2Layer && ol2Layer.destroyFeatures) ol2Layer.destroyFeatures();
     } catch (_) {}
     try {
+      if (ol2AccLayer && ol2AccLayer.destroyFeatures) ol2AccLayer.destroyFeatures();
+    } catch (_) {}
+    try {
       if (ol6Layer) {
         const src = ol6Layer.getSource && ol6Layer.getSource();
         if (src && src.clear) src.clear();
@@ -547,6 +606,9 @@
       if (ol2Layer && ol2Layer.setVisibility) ol2Layer.setVisibility(!!v);
     } catch (_) {}
     try {
+      if (ol2AccLayer && ol2AccLayer.setVisibility) ol2AccLayer.setVisibility(!!v);
+    } catch (_) {}
+    try {
       if (ol6Layer && ol6Layer.setVisible) ol6Layer.setVisible(!!v);
     } catch (_) {}
   }
@@ -555,21 +617,41 @@
     ensureOl2Layer(olm);
     if (!ol2Layer) return;
     ol2Layer.destroyFeatures();
+    if (ol2AccLayer) ol2AccLayer.destroyFeatures();
     const proj =
       typeof olm.getProjectionObject === 'function'
         ? olm.getProjectionObject()
         : olm.projection;
     if (!proj) return;
     const wgs = new OpenLayers.Projection('EPSG:4326');
-    const feats = [];
+    const markers = [];
+    const circles = [];
     for (let i = 0; i < reports.length; i++) {
       const r = reports[i];
       const lon = Number(r.lon);
       const lat = Number(r.lat);
       if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+      const acc = accuracyMeters(r);
+      if (acc != null && ol2AccLayer) {
+        const ring = accuracyRingLonLat(lon, lat, acc);
+        const pts = [];
+        for (let j = 0; j < ring.length; j++) {
+          const p = new OpenLayers.Geometry.Point(ring[j][0], ring[j][1]).transform(
+            wgs,
+            proj,
+          );
+          pts.push(p);
+        }
+        circles.push(
+          new OpenLayers.Feature.Vector(
+            new OpenLayers.Geometry.Polygon([new OpenLayers.Geometry.LinearRing(pts)]),
+            { report: r },
+          ),
+        );
+      }
       const ll = new OpenLayers.LonLat(lon, lat).transform(wgs, proj);
       const geom = new OpenLayers.Geometry.Point(ll.lon, ll.lat);
-      feats.push(
+      markers.push(
         new OpenLayers.Feature.Vector(geom, {
           report: r,
           iconUrl: iconForReport(r),
@@ -577,7 +659,8 @@
         }),
       );
     }
-    if (feats.length) ol2Layer.addFeatures(feats);
+    if (circles.length && ol2AccLayer) ol2AccLayer.addFeatures(circles);
+    if (markers.length) ol2Layer.addFeatures(markers);
   }
 
   function fillOl6(olm, reports) {
@@ -596,14 +679,29 @@
       const lon = Number(r.lon);
       const lat = Number(r.lat);
       if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue;
+      const acc = accuracyMeters(r);
+      if (acc != null) {
+        const ring = accuracyRingLonLat(lon, lat, acc).map(function (ll) {
+          return ol.proj.fromLonLat(ll, fromProj);
+        });
+        feats.push(
+          new ol.Feature({
+            geometry: new ol.geom.Polygon([ring]),
+            kind: 'accuracy',
+            report: r,
+          }),
+        );
+      }
       const xy = ol.proj.fromLonLat([lon, lat], fromProj);
-      const f = new ol.Feature({
-        geometry: new ol.geom.Point(xy),
-        report: r,
-        iconUrl: iconForReport(r),
-        headingDeg: r.headingDeg,
-      });
-      feats.push(f);
+      feats.push(
+        new ol.Feature({
+          geometry: new ol.geom.Point(xy),
+          kind: 'marker',
+          report: r,
+          iconUrl: iconForReport(r),
+          headingDeg: r.headingDeg,
+        }),
+      );
     }
     if (feats.length) src.addFeatures(feats);
   }
@@ -894,7 +992,7 @@
     const hint = document.createElement('div');
     hint.style.cssText = 'margin-top:10px;font-size:11px;color:#777';
     hint.textContent =
-      'Speed limits render as circular road signs (red ring). Click a marker for Done / Dismiss.';
+      'Speed limits render as circular road signs (red ring). Blue circle = GPS accuracy. Click a marker for Done / Dismiss.';
     root.appendChild(hint);
 
     tabPane.appendChild(root);

@@ -80,11 +80,20 @@ mkdir -p "$ROOT/deploy/public"
 cp -f "$OUT_APK" "$ROOT/deploy/public/app.apk"
 echo "==> Copied to deploy/public/app.apk ($(wc -c < "$ROOT/deploy/public/app.apk") bytes)"
 
+GRADLE="$ANDROID_DIR/app/build.gradle.kts"
+VERSION_CODE="$(grep -oP 'versionCode\s*=\s*\K[0-9]+' "$GRADLE" | head -1)"
+VERSION_NAME="$(grep -oP 'versionName\s*=\s*"\K[^"]+' "$GRADLE" | head -1)"
+APK_URL="https://waze-issues.ster.by/app.apk"
+printf '{"versionCode":%s,"versionName":"%s","apkUrl":"%s"}\n' \
+  "$VERSION_CODE" "$VERSION_NAME" "$APK_URL" > "$ROOT/deploy/public/version.json"
+echo "==> Wrote version.json (code=$VERSION_CODE name=$VERSION_NAME)"
+
 if [[ "$PUBLISH" -eq 1 ]]; then
   SSH_HOST="${WAZE_ISSUES_SSH:-myvps}"
-  echo "==> Publishing to VPS ($SSH_HOST:~/waze-issues/deploy/public/app.apk)"
+  echo "==> Publishing to VPS ($SSH_HOST:~/waze-issues/deploy/public/)"
   scp "$ROOT/deploy/public/app.apk" "${SSH_HOST}:~/waze-issues/deploy/public/app.apk"
-  echo "==> Live at https://waze-issues.ster.by/app.apk"
+  scp "$ROOT/deploy/public/version.json" "${SSH_HOST}:~/waze-issues/deploy/public/version.json"
+  echo "==> Live at $APK_URL (version.json alongside)"
 fi
 
 echo "BUILD_OK: $OUT_APK"

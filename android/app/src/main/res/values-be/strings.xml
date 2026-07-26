@@ -50,4 +50,8 @@
     <string name="direction_saved">Напрамак захаваны (%1$d°)</string>
     <string name="trail_upload_failed">Не ўдалося адправіць траекторыю: %1$s</string>
     <string name="no_gps">Няма GPS — пачакайце трохі і паспрабуйце зноў</string>
+
+    <string name="update_available">Даступная новая версія: %1$s</string>
+    <string name="update_download">Абнавіць</string>
+    <string name="update_later">Пазней</string>
 </resources>

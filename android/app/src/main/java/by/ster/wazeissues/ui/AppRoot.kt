@@ -40,6 +40,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -111,6 +114,13 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
             TextButton(onClick = { vm.openSettings(true) }) {
                 Text(stringResource(R.string.settings))
             }
+        }
+        state.updateAvailable?.let { update ->
+            UpdateBanner(
+                versionName = update.versionName,
+                apkUrl = update.apkUrl,
+                onDismiss = { vm.dismissUpdate() },
+            )
         }
         Text(
             state.statusMessage.ifBlank {
@@ -469,6 +479,44 @@ private fun SpeedLimitEndButton(
                     strokeWidth = size.minDimension * 0.18f,
                     cap = StrokeCap.Round,
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpdateBanner(
+    versionName: String,
+    apkUrl: String,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        shape = RoundedCornerShape(8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+    ) {
+        Row(
+            Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.update_available, versionName),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(apkUrl)),
+                )
+            }) {
+                Text(stringResource(R.string.update_download))
+            }
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.update_later))
             }
         }
     }

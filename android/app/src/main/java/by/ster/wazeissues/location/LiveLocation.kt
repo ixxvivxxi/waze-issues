@@ -33,8 +33,10 @@ data class GpsSample(
  */
 object LiveLocation {
     private const val MAX_SAMPLES = 90
-    /** Prefer fixes newer than this for reporting. */
+    /** Fresh enough for green GPS status in the UI. */
     const val MAX_FIX_AGE_MS = 2_500L
+    /** Still usable for a report if nothing fresher exists. */
+    const val MAX_REPORT_FIX_AGE_MS = 60_000L
     /** Soft warning threshold shown in UI. */
     const val GOOD_ACCURACY_M = 15f
 
@@ -110,11 +112,15 @@ object LiveLocation {
         while (ring.size > MAX_SAMPLES) ring.removeFirst()
     }
 
-    /** Best fix for a report tap: must be reasonably fresh. */
+    /**
+     * Best available fix for a report tap.
+     * Always sends when any recent-enough GPS exists — poor accuracy is OK
+     * (accuracyM is stored so editors can show the uncertainty radius).
+     */
     @Synchronized
     fun snapshotForReport(nowElapsedMs: Long = android.os.SystemClock.elapsedRealtime()): GpsSample? {
         val s = _latest.value ?: return null
-        if (nowElapsedMs - s.timeMs > MAX_FIX_AGE_MS) return null
+        if (nowElapsedMs - s.timeMs > MAX_REPORT_FIX_AGE_MS) return null
         return s
     }
 

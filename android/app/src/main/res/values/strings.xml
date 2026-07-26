@@ -50,4 +50,8 @@
     <string name="direction_saved">Direction saved (%1$d°)</string>
     <string name="trail_upload_failed">Trail upload failed: %1$s</string>
     <string name="no_gps">No GPS fix yet — wait a moment and try again</string>
+
+    <string name="update_available">New version available: %1$s</string>
+    <string name="update_download">Update</string>
+    <string name="update_later">Later</string>
 </resources>

@@ -91,12 +91,24 @@ export class UpdateReportDto {
   status?: ReportStatus;
 }
 
+function attachAccuracyM(
+  payload: Record<string, unknown> | undefined,
+  out: Record<string, unknown>,
+): Record<string, unknown> {
+  const acc = payload?.accuracyM;
+  if (typeof acc === 'number' && Number.isFinite(acc) && acc >= 0) {
+    out.accuracyM = acc;
+  }
+  return out;
+}
+
 export function assertSpeedPayload(
   issueType: IssueType,
   payload: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
   if (issueType !== 'speed_limit') {
-    return payload ?? {};
+    const base = { ...(payload ?? {}) };
+    return attachAccuracyM(payload, base);
   }
   const raw = payload?.valueKmh;
   const valueKmh = typeof raw === 'number' ? raw : Number(raw);
@@ -105,12 +117,7 @@ export function assertSpeedPayload(
       `speed_limit requires payload.valueKmh in [${SPEED_VALUES.join(', ')}]`,
     );
   }
-  const out: Record<string, unknown> = { valueKmh };
-  const acc = payload?.accuracyM;
-  if (typeof acc === 'number' && Number.isFinite(acc)) {
-    out.accuracyM = acc;
-  }
-  return out;
+  return attachAccuracyM(payload, { valueKmh });
 }
 
 export function bearingDegrees(

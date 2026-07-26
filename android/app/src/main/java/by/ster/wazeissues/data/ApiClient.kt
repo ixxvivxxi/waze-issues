@@ -11,6 +11,12 @@ import java.util.concurrent.TimeUnit
 
 data class LonLat(val lon: Double, val lat: Double)
 
+data class AppVersion(
+    val versionCode: Int,
+    val versionName: String,
+    val apkUrl: String,
+)
+
 data class ReportRemote(
     val id: String,
     val issueType: String,
@@ -60,6 +66,31 @@ class ApiClient(
                 .post(body.toString().toRequestBody(jsonMedia))
                 .build()
         return parseReport(execute(req))
+    }
+
+    /** Reads the published version.json next to the APK. Null on any failure. */
+    fun fetchLatestVersion(baseUrl: String): AppVersion? {
+        val base = baseUrl.trimEnd('/')
+        val req =
+            Request.Builder()
+                .url("$base/version.json")
+                .get()
+                .build()
+        return try {
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val obj = JSONObject(resp.body?.string().orEmpty())
+                val code = obj.optInt("versionCode", -1)
+                if (code < 0) return null
+                AppVersion(
+                    versionCode = code,
+                    versionName = obj.optString("versionName"),
+                    apkUrl = obj.optString("apkUrl").ifBlank { "$base/app.apk" },
+                )
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun patchTrajectory(id: String, points: List<LonLat>, headingDeg: Double?): ReportRemote {
