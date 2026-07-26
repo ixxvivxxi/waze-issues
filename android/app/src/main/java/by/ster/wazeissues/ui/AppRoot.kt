@@ -21,7 +21,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -45,7 +47,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import by.ster.wazeissues.AppLocales
 import by.ster.wazeissues.R
+import by.ster.wazeissues.location.LiveLocation
 
 private val SpeedSignRed = Color(0xFFE30613)
 private val SpeedSignBg = Color(0xFFFFFFF8)
@@ -58,12 +62,27 @@ private val SyncFail = Color(0xFFC62828)
 private val SyncPending = Color(0xFF9E9E9E)
 
 @Composable
+private fun gpsStatusText(state: UiState): String {
+    val acc = state.gpsAccuracyM
+    return when {
+        acc == null -> stringResource(R.string.gps_searching)
+        !state.hasFreshGps -> stringResource(R.string.gps_stale, acc.toInt())
+        else -> stringResource(R.string.gps_accuracy, acc.toInt())
+    }
+}
+
+@Composable
 fun AppRoot(vm: MainViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     MaterialTheme {
         Surface(Modifier.fillMaxSize()) {
             when {
-                state.showSettings -> SettingsScreen(state, vm)
+                !state.settingsLoaded -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(stringResource(R.string.loading))
+                    }
+                }
+                !state.settingsReady || state.showSettings -> SettingsScreen(state, vm)
                 state.editingId != null -> EditNoteScreen(state, vm)
                 else -> MainScreen(state, vm)
             }
@@ -98,6 +117,19 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
                 stringResource(R.string.status_idle, nickShown)
             },
             fontSize = 12.sp,
+            modifier = Modifier.padding(bottom = 2.dp),
+        )
+        Text(
+            gpsStatusText(state),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color =
+                when {
+                    !state.hasFreshGps -> MaterialTheme.colorScheme.error
+                    (state.gpsAccuracyM ?: 999f) > LiveLocation.GOOD_ACCURACY_M ->
+                        Color(0xFFB26A00)
+                    else -> Color(0xFF2E7D32)
+                },
             modifier = Modifier.padding(bottom = 6.dp),
         )
 
@@ -449,6 +481,33 @@ private fun SettingsScreen(state: UiState, vm: MainViewModel) {
     var apiBase by remember(state.apiBase) { mutableStateOf(state.apiBase) }
     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.settings), style = MaterialTheme.typography.titleLarge)
+        Text(
+            stringResource(R.string.language_label),
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            LanguageOption(
+                label = "English",
+                selected = state.language == AppLocales.EN,
+                onClick = { vm.setLanguage(AppLocales.EN) },
+                modifier = Modifier.weight(1f),
+            )
+            LanguageOption(
+                label = "Русский",
+                selected = state.language == AppLocales.RU,
+                onClick = { vm.setLanguage(AppLocales.RU) },
+                modifier = Modifier.weight(1f),
+            )
+            LanguageOption(
+                label = "Беларуская",
+                selected = state.language == AppLocales.BE,
+                onClick = { vm.setLanguage(AppLocales.BE) },
+                modifier = Modifier.weight(1f),
+            )
+        }
         OutlinedTextField(
             value = nick,
             onValueChange = { nick = it },
@@ -474,9 +533,44 @@ private fun SettingsScreen(state: UiState, vm: MainViewModel) {
             Button(onClick = { vm.saveSettings(nick, apiKey, apiBase) }) {
                 Text(stringResource(R.string.save))
             }
-            TextButton(onClick = { vm.openSettings(false) }) {
-                Text(stringResource(R.string.back))
+            if (state.settingsReady) {
+                TextButton(onClick = { vm.openSettings(false) }) {
+                    Text(stringResource(R.string.back))
+                }
             }
+        }
+        if (!state.settingsReady) {
+            Text(
+                stringResource(R.string.settings_required_hint),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LanguageOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (selected) {
+        Button(
+            onClick = onClick,
+            modifier = modifier,
+            contentPadding = ButtonDefaults.ContentPadding,
+        ) {
+            Text(label, fontSize = 12.sp, maxLines = 1)
+        }
+    } else {
+        OutlinedButton(
+            onClick = onClick,
+            modifier = modifier,
+            contentPadding = ButtonDefaults.ContentPadding,
+        ) {
+            Text(label, fontSize = 12.sp, maxLines = 1)
         }
     }
 }

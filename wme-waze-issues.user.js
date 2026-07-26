@@ -646,6 +646,11 @@
       r.headingDeg != null && Number.isFinite(Number(r.headingDeg))
         ? Number(r.headingDeg).toFixed(0) + '°'
         : '—';
+    const accRaw = r.payload && r.payload.accuracyM;
+    const accuracy =
+      accRaw != null && Number.isFinite(Number(accRaw))
+        ? '±' + Math.round(Number(accRaw)) + ' m'
+        : '—';
     const when = r.createdAt ? new Date(r.createdAt).toLocaleString() : '';
     popupEl.innerHTML =
       '<div style="font-weight:600;margin-bottom:6px">' +
@@ -658,6 +663,8 @@
       escapeHtml(when) +
       '<br>heading ' +
       escapeHtml(heading) +
+      ' · GPS ' +
+      escapeHtml(accuracy) +
       '<br>' +
       Number(r.lat).toFixed(6) +
       ', ' +

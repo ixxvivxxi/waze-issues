@@ -105,7 +105,12 @@ export function assertSpeedPayload(
       `speed_limit requires payload.valueKmh in [${SPEED_VALUES.join(', ')}]`,
     );
   }
-  return { valueKmh };
+  const out: Record<string, unknown> = { valueKmh };
+  const acc = payload?.accuracyM;
+  if (typeof acc === 'number' && Number.isFinite(acc)) {
+    out.accuracyM = acc;
+  }
+  return out;
 }
 
 export function bearingDegrees(

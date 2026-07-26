@@ -22,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 class LocationTrailService : Service() {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -34,8 +35,9 @@ class LocationTrailService : Service() {
     private val callback =
         object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
-                val loc = result.lastLocation ?: return
-                points += LonLat(loc.longitude, loc.latitude)
+                for (loc in result.locations) {
+                    points += LonLat(loc.longitude, loc.latitude)
+                }
                 TrailBus.publish(points.toList())
             }
         }
@@ -50,15 +52,18 @@ class LocationTrailService : Service() {
                 return START_NOT_STICKY
             }
             else -> {
-                val nextId = intent?.getStringExtra(EXTRA_REPORT_ID)
+                val nextId = intent?.getStringExtra(EXTRA_REPORT_ID) ?: return START_NOT_STICKY
                 flushCurrentTrail()
                 reportId = nextId
-                startForeground(NOTIF_ID, buildNotification())
+                val seed = TrailBus.takeSeed(nextId)
                 points.clear()
+                points.addAll(seed)
+                startForeground(NOTIF_ID, buildNotification())
                 if (!updatesActive) {
                     val req =
-                        LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L)
-                            .setMinUpdateIntervalMillis(500L)
+                        LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 500L)
+                            .setMinUpdateIntervalMillis(250L)
+                            .setMinUpdateDistanceMeters(0f)
                             .setWaitForAccurateLocation(false)
                             .build()
                     fused.requestLocationUpdates(req, callback, mainLooper)
@@ -114,7 +119,7 @@ class LocationTrailService : Service() {
     companion object {
         const val ACTION_STOP = "by.ster.wazeissues.STOP_TRAIL"
         const val EXTRA_REPORT_ID = "report_id"
-        const val TRAIL_MS = 20_000L
+        const val TRAIL_MS = 15_000L
         private const val NOTIF_ID = 42
     }
 }
@@ -122,6 +127,14 @@ class LocationTrailService : Service() {
 object TrailBus {
     @Volatile
     var onFinished: ((reportId: String, points: List<LonLat>) -> Unit)? = null
+
+    private val seeds = ConcurrentHashMap<String, List<LonLat>>()
+
+    fun seed(reportId: String, points: List<LonLat>) {
+        seeds[reportId] = points
+    }
+
+    fun takeSeed(reportId: String): List<LonLat> = seeds.remove(reportId).orEmpty()
 
     fun publish(@Suppress("UNUSED_PARAMETER") points: List<LonLat>) {}
 

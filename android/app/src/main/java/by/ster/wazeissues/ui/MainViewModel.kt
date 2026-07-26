@@ -4,22 +4,25 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.SystemClock
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import by.ster.wazeissues.AppLocales
 import by.ster.wazeissues.R
 import by.ster.wazeissues.data.ApiClient
 import by.ster.wazeissues.data.LonLat
 import by.ster.wazeissues.data.SettingsStore
-import by.ster.wazeissues.location.LocationFix
+import by.ster.wazeissues.location.LiveLocation
 import by.ster.wazeissues.location.LocationTrailService
 import by.ster.wazeissues.location.TrailBus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -47,12 +50,19 @@ data class UiState(
     val nick: String = "",
     val apiKey: String = "",
     val apiBase: String = "",
+    val settingsReady: Boolean = false,
+    val settingsLoaded: Boolean = false,
     val busy: Boolean = false,
     val statusMessage: String = "",
     val recent: List<RecentItem> = emptyList(),
     val showSettings: Boolean = false,
     val editingId: String? = null,
     val editingText: String = "",
+    /** Current GPS horizontal accuracy in meters; null if no fix yet. */
+    val gpsAccuracyM: Float? = null,
+    val gpsAgeMs: Long? = null,
+    val hasFreshGps: Boolean = false,
+    val language: String = AppLocales.EN,
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -72,35 +82,83 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         getApplication<Application>().getString(resId, *args)
 
     init {
+        LiveLocation.start(app)
+        _state.update { it.copy(language = AppLocales.currentTag()) }
         viewModelScope.launch {
-            settings.nick.collect { nick -> _state.update { it.copy(nick = nick) } }
+            combine(settings.nick, settings.apiKey, settings.apiBase) { nick, key, base ->
+                Triple(nick, key, base)
+            }.collect { (nick, key, base) ->
+                val ready = nick.isNotBlank() && key.isNotBlank()
+                _state.update { s ->
+                    s.copy(
+                        nick = nick,
+                        apiKey = key,
+                        apiBase = base,
+                        settingsReady = ready,
+                        settingsLoaded = true,
+                        showSettings = if (!ready) true else s.showSettings,
+                        language = AppLocales.currentTag(),
+                    )
+                }
+            }
         }
         viewModelScope.launch {
-            settings.apiKey.collect { key -> _state.update { it.copy(apiKey = key) } }
-        }
-        viewModelScope.launch {
-            settings.apiBase.collect { base -> _state.update { it.copy(apiBase = base) } }
+            LiveLocation.latest.collect { sample ->
+                val now = SystemClock.elapsedRealtime()
+                _state.update {
+                    it.copy(
+                        gpsAccuracyM = sample?.accuracyM,
+                        gpsAgeMs = sample?.let { s -> now - s.timeMs },
+                        hasFreshGps =
+                            sample != null && now - sample.timeMs <= LiveLocation.MAX_FIX_AGE_MS,
+                    )
+                }
+            }
         }
         TrailBus.onFinished = { id, points ->
             viewModelScope.launch { uploadTrajectory(id, points) }
         }
     }
 
+    override fun onCleared() {
+        TrailBus.onFinished = null
+        LiveLocation.stop()
+        super.onCleared()
+    }
+
     fun openSettings(open: Boolean) {
-        _state.update { it.copy(showSettings = open) }
+        if (!open && !_state.value.settingsReady) return
+        _state.update { it.copy(showSettings = open, language = AppLocales.currentTag()) }
+    }
+
+    fun setLanguage(tag: String) {
+        if (tag !in AppLocales.supported) return
+        AppLocales.apply(tag)
+        _state.update { it.copy(language = tag) }
     }
 
     fun saveSettings(nick: String, apiKey: String, apiBase: String) {
+        val n = nick.trim()
+        val k = apiKey.trim()
+        if (n.isBlank()) {
+            _state.update { it.copy(statusMessage = str(R.string.need_nick), showSettings = true) }
+            return
+        }
+        if (k.isBlank()) {
+            _state.update { it.copy(statusMessage = str(R.string.need_api_key), showSettings = true) }
+            return
+        }
         viewModelScope.launch {
-            settings.setNick(nick)
-            settings.setApiKey(apiKey)
+            settings.setNick(n)
+            settings.setApiKey(k)
             settings.setApiBase(apiBase)
             _state.update {
                 it.copy(
                     showSettings = false,
+                    settingsReady = true,
                     statusMessage = str(R.string.settings_saved),
-                    nick = nick.trim(),
-                    apiKey = apiKey.trim(),
+                    nick = n,
+                    apiKey = k,
                     apiBase = apiBase.trim().trimEnd('/'),
                 )
             }
@@ -187,18 +245,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun sendReport(issueType: String, label: String, valueKmh: Int?) {
         val s = _state.value
-        if (s.nick.isBlank()) {
+        if (!s.settingsReady) {
             _state.update {
                 it.copy(statusMessage = str(R.string.need_nick), showSettings = true)
             }
             return
         }
-        if (s.apiKey.isBlank()) {
-            _state.update {
-                it.copy(statusMessage = str(R.string.need_api_key), showSettings = true)
-            }
-            return
-        }
+
+        // Capture GPS at tap time — do not wait for network.
+        val fix =
+            LiveLocation.snapshotForReport()
+                ?: run {
+                    _state.update { it.copy(statusMessage = str(R.string.no_gps)) }
+                    return
+                }
+        val seedBefore = LiveLocation.recentPoints(12_000L)
 
         val localId = UUID.randomUUID().toString()
         val createdAt = Instant.now().toString()
@@ -210,17 +271,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 createdAt = createdAt,
                 syncStatus = SyncStatus.Pending,
             )
+        val accHint =
+            fix.accuracyM?.let { str(R.string.queued_with_accuracy, label, it.toInt()) }
+                ?: str(R.string.queued, label)
         _state.update {
             it.copy(
                 recent = (listOf(pending) + it.recent).take(30),
-                statusMessage = str(R.string.queued, label),
+                statusMessage = accHint,
             )
         }
         vibrate()
 
         viewModelScope.launch {
             try {
-                val fix = LocationFix.current(getApplication())
                 val created =
                     withContext(Dispatchers.IO) {
                         api.createReport(
@@ -230,6 +293,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             reporterNick = s.nick,
                             valueKmh = valueKmh,
                             clientEventId = localId,
+                            accuracyM = fix.accuracyM,
                         )
                     }
                 _state.update { st ->
@@ -250,6 +314,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                             },
                     )
                 }
+                val after = LiveLocation.pointsSince(fix.timeMs)
+                val seed = dedupePoints(seedBefore + fix.toLonLat() + after)
+                TrailBus.seed(created.id, seed)
                 startTrailService(created.id)
             } catch (e: Exception) {
                 _state.update { st ->
@@ -267,6 +334,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+    }
+
+    private fun dedupePoints(points: List<LonLat>): List<LonLat> {
+        if (points.isEmpty()) return points
+        val out = ArrayList<LonLat>(points.size)
+        var prev: LonLat? = null
+        for (p in points) {
+            if (prev == null || prev.lon != p.lon || prev.lat != p.lat) {
+                out += p
+                prev = p
+            }
+        }
+        return out
     }
 
     private fun startTrailService(reportId: String) {

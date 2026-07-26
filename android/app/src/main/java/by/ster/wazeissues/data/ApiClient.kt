@@ -42,9 +42,11 @@ class ApiClient(
         reporterNick: String,
         valueKmh: Int? = null,
         clientEventId: String = UUID.randomUUID().toString(),
+        accuracyM: Float? = null,
     ): ReportRemote {
         val payload = JSONObject()
         if (valueKmh != null) payload.put("valueKmh", valueKmh)
+        if (accuracyM != null) payload.put("accuracyM", accuracyM.toDouble())
         val body =
             JSONObject()
                 .put("issueType", issueType)
