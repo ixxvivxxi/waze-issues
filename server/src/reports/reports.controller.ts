@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
@@ -60,5 +61,10 @@ export class ReportsController {
     @Body() body: UpdateReportDto,
   ) {
     return this.reports.update(id, body);
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.reports.remove(id);
   }
 }

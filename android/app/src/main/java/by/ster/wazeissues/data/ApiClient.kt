@@ -49,11 +49,13 @@ class ApiClient(
         lat: Double,
         reporterNick: String,
         valueKmh: Int? = null,
+        lengthM: Int? = null,
         clientEventId: String = UUID.randomUUID().toString(),
         accuracyM: Float? = null,
     ): ReportRemote {
         val payload = JSONObject()
         if (valueKmh != null) payload.put("valueKmh", valueKmh)
+        if (lengthM != null) payload.put("lengthM", lengthM)
         if (accuracyM != null) payload.put("accuracyM", accuracyM.toDouble())
         val body =
             JSONObject()
@@ -145,6 +147,38 @@ class ApiClient(
                 .patch(body.toString().toRequestBody(jsonMedia))
                 .build()
         return parseReport(execute(req))
+    }
+
+    fun patchReport(
+        id: String,
+        description: String? = null,
+        lengthM: Int? = null,
+    ): ReportRemote {
+        val body = JSONObject()
+        if (description != null) body.put("description", description)
+        if (lengthM != null) {
+            body.put("payload", JSONObject().put("lengthM", lengthM))
+        }
+        val req =
+            Request.Builder()
+                .url("${baseUrlProvider().trimEnd('/')}/api/reports/$id")
+                .patch(body.toString().toRequestBody(jsonMedia))
+                .build()
+        return parseReport(execute(req))
+    }
+
+    fun deleteReport(id: String) {
+        val req =
+            Request.Builder()
+                .url("${baseUrlProvider().trimEnd('/')}/api/reports/$id")
+                .delete()
+                .build()
+        client.newCall(req).execute().use { resp ->
+            val text = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) {
+                throw IllegalStateException("HTTP ${resp.code}: $text")
+            }
+        }
     }
 
     private fun execute(req: Request): JSONObject {

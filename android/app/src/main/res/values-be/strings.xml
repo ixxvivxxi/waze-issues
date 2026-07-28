@@ -14,6 +14,14 @@
     <string name="speed_limit_section">Абмежаванне хуткасці</string>
     <string name="add_note">Дадаць нататку</string>
     <string name="description">Апісанне</string>
+    <string name="length_section">Даўжыня абмежавання</string>
+    <string name="length_meters">%1$d м</string>
+    <string name="length_unlimited">Да знакаў (∞)</string>
+    <string name="length_hint">0 м = да наступных знакаў абмежавання</string>
+    <string name="delete_report">Выдаліць справаздачу</string>
+    <string name="report_deleted">Справаздачу выдалена</string>
+    <string name="report_delete_failed">Не ўдалося выдаліць справаздачу</string>
+    <string name="note_saved_local">Захавана лакальна — адправіцца пасля загрузкі</string>
     <string name="nick_label">Нік (бачны рэдактарам)</string>
     <string name="api_base_label">Базавы URL API</string>
     <string name="tap_to_add_note">Націсніце, каб дадаць нататку</string>

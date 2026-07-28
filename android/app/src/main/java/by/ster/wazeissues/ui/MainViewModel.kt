@@ -52,6 +52,7 @@ data class OutboundPayload(
     val lon: Double,
     val lat: Double,
     val valueKmh: Int?,
+    val lengthM: Int?,
     val accuracyM: Float?,
     val fixTimeMs: Long,
     val seedPoints: List<LonLat>,
@@ -64,6 +65,10 @@ data class RecentItem(
     val createdAt: String,
     val syncStatus: SyncStatus = SyncStatus.Synced,
     val outbound: OutboundPayload? = null,
+    val issueType: String? = null,
+    val valueKmh: Int? = null,
+    /** Applicability length in meters; 0 = until signs. Null if N/A. */
+    val lengthM: Int? = null,
 )
 
 data class UpdateInfo(
@@ -82,6 +87,10 @@ data class UiState(
     val showSettings: Boolean = false,
     val editingId: String? = null,
     val editingText: String = "",
+    val editingIssueType: String? = null,
+    val editingValueKmh: Int? = null,
+    val editingLengthM: Int = 0,
+    val editingLabel: String = "",
     /** Current GPS horizontal accuracy in meters; null if no fix yet. */
     val gpsAccuracyM: Float? = null,
     val gpsAgeMs: Long? = null,
@@ -102,6 +111,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         ApiClient(
             baseUrlProvider = { _state.value.apiBase },
         )
+
+    /** Local ids discarded by the user before/while upload — DELETE after sync. */
+    private val discardAfterUpload = mutableSetOf<String>()
+
+    /** Local ids that should open the editor as soon as the report is queued. */
+    private val openEditAfterQueue = mutableSetOf<String>()
 
     private fun str(resId: Int): String = getApplication<Application>().getString(resId)
 
@@ -160,6 +175,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         private const val RETRY_INTERVAL_MS = 15_000L
+        const val LENGTH_MIN_M = 0
+        const val LENGTH_MAX_M = 1000
+        const val LENGTH_STEP_M = 50
     }
 
     private suspend fun checkForUpdate() {
@@ -282,38 +300,151 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             SyncStatus.Pending -> {
                 _state.update { it.copy(statusMessage = str(R.string.wait_until_synced)) }
             }
-            SyncStatus.Synced -> {
-                _state.update {
-                    it.copy(editingId = item.id, editingText = item.description.orEmpty())
-                }
-            }
+            SyncStatus.Synced -> openEditorFor(item)
+        }
+    }
+
+    private fun openEditorFor(item: RecentItem) {
+        val showLength =
+            item.issueType == "speed_limit" && (item.valueKmh ?: 0) != 0
+        _state.update {
+            it.copy(
+                editingId = item.id,
+                editingText = item.description.orEmpty(),
+                editingIssueType = item.issueType,
+                editingValueKmh = item.valueKmh,
+                editingLengthM = if (showLength) (item.lengthM ?: 0) else 0,
+                editingLabel = item.label,
+            )
         }
     }
 
     fun setEditingText(text: String) {
-        _state.update { it.copy(editingText = text) }
+        _state.update { s ->
+            val id = s.editingId
+            s.copy(
+                editingText = text,
+                recent =
+                    if (id == null) {
+                        s.recent
+                    } else {
+                        s.recent.map {
+                            if (it.id == id) it.copy(description = text) else it
+                        }
+                    },
+            )
+        }
+    }
+
+    fun setEditingLengthM(meters: Int) {
+        val snapped =
+            (meters.coerceIn(LENGTH_MIN_M, LENGTH_MAX_M) / LENGTH_STEP_M) * LENGTH_STEP_M
+        _state.update { s ->
+            val id = s.editingId
+            s.copy(
+                editingLengthM = snapped,
+                recent =
+                    if (id == null) {
+                        s.recent
+                    } else {
+                        s.recent.map { item ->
+                            if (item.id != id) {
+                                item
+                            } else {
+                                item.copy(
+                                    lengthM = snapped,
+                                    outbound = item.outbound?.copy(lengthM = snapped),
+                                )
+                            }
+                        }
+                    },
+            )
+        }
     }
 
     fun closeEdit() {
-        _state.update { it.copy(editingId = null, editingText = "") }
+        _state.update {
+            it.copy(
+                editingId = null,
+                editingText = "",
+                editingIssueType = null,
+                editingValueKmh = null,
+                editingLengthM = 0,
+                editingLabel = "",
+            )
+        }
     }
 
     fun saveDescription() {
         val id = _state.value.editingId ?: return
         val text = _state.value.editingText
+        val issueType = _state.value.editingIssueType
+        val valueKmh = _state.value.editingValueKmh
+        val lengthM = _state.value.editingLengthM
+        val patchLength = issueType == "speed_limit" && (valueKmh ?: 0) != 0
+        val item = _state.value.recent.firstOrNull { it.id == id }
+
+        // Still uploading — keep values locally; uploadOne / a later save will PATCH.
+        if (item != null && item.syncStatus != SyncStatus.Synced) {
+            _state.update { s ->
+                s.copy(
+                    editingId = null,
+                    editingText = "",
+                    editingIssueType = null,
+                    editingValueKmh = null,
+                    editingLengthM = 0,
+                    editingLabel = "",
+                    statusMessage = str(R.string.note_saved_local),
+                    recent =
+                        s.recent.map {
+                            if (it.id != id) {
+                                it
+                            } else {
+                                it.copy(
+                                    description = text,
+                                    lengthM = if (patchLength) lengthM else it.lengthM,
+                                    outbound =
+                                        it.outbound?.copy(
+                                            lengthM = if (patchLength) lengthM else it.outbound.lengthM,
+                                        ),
+                                )
+                            }
+                        },
+                )
+            }
+            return
+        }
+
         viewModelScope.launch {
             _state.update { it.copy(busy = true) }
             try {
-                withContext(Dispatchers.IO) { api.patchDescription(id, text) }
+                withContext(Dispatchers.IO) {
+                    api.patchReport(
+                        id = id,
+                        description = text,
+                        lengthM = if (patchLength) lengthM else null,
+                    )
+                }
                 _state.update { s ->
                     s.copy(
                         busy = false,
                         editingId = null,
                         editingText = "",
+                        editingIssueType = null,
+                        editingValueKmh = null,
+                        editingLengthM = 0,
+                        editingLabel = "",
                         statusMessage = str(R.string.note_saved),
                         recent =
                             s.recent.map {
-                                if (it.id == id) it.copy(description = text) else it
+                                if (it.id == id) {
+                                    it.copy(
+                                        description = text,
+                                        lengthM = if (patchLength) lengthM else it.lengthM,
+                                    )
+                                } else {
+                                    it
+                                }
                             },
                     )
                 }
@@ -328,16 +459,57 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun deleteEditingReport() {
+        val id = _state.value.editingId ?: return
+        val item = _state.value.recent.firstOrNull { it.id == id }
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true) }
+            try {
+                when {
+                    item == null -> Unit
+                    item.syncStatus == SyncStatus.Synced -> {
+                        withContext(Dispatchers.IO) { api.deleteReport(id) }
+                    }
+                    else -> {
+                        // Still uploading — drop locally and delete once the server accepts it.
+                        discardAfterUpload += id
+                    }
+                }
+                _state.update { s ->
+                    s.copy(
+                        busy = false,
+                        editingId = null,
+                        editingText = "",
+                        editingIssueType = null,
+                        editingValueKmh = null,
+                        editingLengthM = 0,
+                        editingLabel = "",
+                        statusMessage = str(R.string.report_deleted),
+                        recent = s.recent.filter { it.id != id },
+                    )
+                }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        statusMessage = e.message ?: str(R.string.report_delete_failed),
+                    )
+                }
+            }
+        }
+    }
+
     fun reportBump(add: Boolean) {
         sendReport(
             issueType = if (add) "speed_bump_add" else "speed_bump_remove",
             label =
                 if (add) str(R.string.label_bump_add) else str(R.string.label_bump_remove),
             valueKmh = null,
+            lengthM = null,
         )
     }
 
-    fun reportSpeed(kmh: Int) {
+    fun reportSpeed(kmh: Int, openLengthEditor: Boolean = false) {
         sendReport(
             issueType = "speed_limit",
             label =
@@ -347,6 +519,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     str(R.string.label_speed_kmh, kmh)
                 },
             valueKmh = kmh,
+            lengthM = if (kmh == 0) null else 0,
+            openLengthEditor = openLengthEditor && kmh != 0,
         )
     }
 
@@ -355,10 +529,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             issueType = "general",
             label = str(R.string.label_general),
             valueKmh = null,
+            lengthM = null,
         )
     }
 
-    private fun sendReport(issueType: String, label: String, valueKmh: Int?) {
+    private fun sendReport(
+        issueType: String,
+        label: String,
+        valueKmh: Int?,
+        lengthM: Int?,
+        openLengthEditor: Boolean = false,
+    ) {
         val s = _state.value
         if (!s.settingsReady) {
             _state.update {
@@ -384,6 +565,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 lon = fix.lon,
                 lat = fix.lat,
                 valueKmh = valueKmh,
+                lengthM = lengthM,
                 accuracyM = fix.accuracyM,
                 fixTimeMs = fix.timeMs,
                 seedPoints = seedBefore,
@@ -396,15 +578,34 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 createdAt = createdAt,
                 syncStatus = SyncStatus.Pending,
                 outbound = outbound,
+                issueType = issueType,
+                valueKmh = valueKmh,
+                lengthM = lengthM,
             )
         val accHint =
             fix.accuracyM?.let { str(R.string.queued_with_accuracy, label, it.toInt()) }
                 ?: str(R.string.queued, label)
+        if (openLengthEditor) {
+            openEditAfterQueue += localId
+        }
         _state.update {
-            it.copy(
-                recent = (listOf(pending) + it.recent).take(30),
-                statusMessage = accHint,
-            )
+            var next =
+                it.copy(
+                    recent = (listOf(pending) + it.recent).take(30),
+                    statusMessage = accHint,
+                )
+            if (openLengthEditor) {
+                next =
+                    next.copy(
+                        editingId = localId,
+                        editingText = "",
+                        editingIssueType = issueType,
+                        editingValueKmh = valueKmh,
+                        editingLengthM = lengthM ?: 0,
+                        editingLabel = label,
+                    )
+            }
+            next
         }
         vibrate()
 
@@ -466,31 +667,101 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         outbound: OutboundPayload,
         nick: String,
     ): Boolean {
+        // Prefer latest outbound from state (user may have adjusted length while pending).
+        val latestOutbound =
+            _state.value.recent.firstOrNull { it.id == localId }?.outbound ?: outbound
         return try {
             val created =
                 withContext(Dispatchers.IO) {
                     api.createReport(
-                        issueType = outbound.issueType,
-                        lon = outbound.lon,
-                        lat = outbound.lat,
+                        issueType = latestOutbound.issueType,
+                        lon = latestOutbound.lon,
+                        lat = latestOutbound.lat,
                         reporterNick = nick,
-                        valueKmh = outbound.valueKmh,
+                        valueKmh = latestOutbound.valueKmh,
+                        lengthM = latestOutbound.lengthM,
                         clientEventId = localId,
-                        accuracyM = outbound.accuracyM,
+                        accuracyM = latestOutbound.accuracyM,
                     )
                 }
+            if (localId in discardAfterUpload) {
+                discardAfterUpload.remove(localId)
+                try {
+                    withContext(Dispatchers.IO) { api.deleteReport(created.id) }
+                } catch (_: Exception) {
+                }
+                _state.update { st ->
+                    st.copy(
+                        recent = st.recent.filter { it.id != localId && it.id != created.id },
+                        editingId =
+                            if (st.editingId == localId || st.editingId == created.id) {
+                                null
+                            } else {
+                                st.editingId
+                            },
+                        editingText = if (st.editingId == localId) "" else st.editingText,
+                        editingIssueType =
+                            if (st.editingId == localId) null else st.editingIssueType,
+                        editingValueKmh =
+                            if (st.editingId == localId) null else st.editingValueKmh,
+                        editingLengthM = if (st.editingId == localId) 0 else st.editingLengthM,
+                        editingLabel = if (st.editingId == localId) "" else st.editingLabel,
+                    )
+                }
+                return true
+            }
+
+            openEditAfterQueue.remove(localId)
+            val localItem = _state.value.recent.firstOrNull { it.id == localId }
+            val editingHere = _state.value.editingId == localId
+            val finalDesc =
+                when {
+                    editingHere && _state.value.editingText.isNotBlank() ->
+                        _state.value.editingText
+                    !localItem?.description.isNullOrBlank() -> localItem?.description
+                    else -> created.description
+                }
+            val finalLength =
+                when {
+                    latestOutbound.issueType != "speed_limit" ||
+                        (latestOutbound.valueKmh ?: 0) == 0 -> null
+                    editingHere -> _state.value.editingLengthM
+                    else -> localItem?.lengthM ?: latestOutbound.lengthM ?: 0
+                }
+
+            // CREATE already sent lengthM; PATCH if description set or length diverged after POST started.
+            val needDescPatch = !finalDesc.isNullOrBlank()
+            val needLengthPatch =
+                finalLength != null && finalLength != (latestOutbound.lengthM ?: 0)
+            if (needDescPatch || needLengthPatch) {
+                try {
+                    withContext(Dispatchers.IO) {
+                        api.patchReport(
+                            id = created.id,
+                            description = if (needDescPatch) finalDesc else null,
+                            lengthM = if (needLengthPatch) finalLength else null,
+                        )
+                    }
+                } catch (_: Exception) {
+                }
+            }
+
             _state.update { st ->
                 st.copy(
                     statusMessage = str(R.string.sent, label),
+                    editingId = if (st.editingId == localId) created.id else st.editingId,
                     recent =
                         st.recent.map { item ->
                             if (item.id == localId) {
                                 item.copy(
                                     id = created.id,
-                                    description = created.description,
+                                    description = finalDesc,
                                     createdAt = created.createdAt,
                                     syncStatus = SyncStatus.Synced,
                                     outbound = null,
+                                    issueType = latestOutbound.issueType,
+                                    valueKmh = latestOutbound.valueKmh,
+                                    lengthM = finalLength,
                                 )
                             } else {
                                 item
@@ -498,11 +769,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                         },
                 )
             }
-            val after = LiveLocation.pointsSince(outbound.fixTimeMs)
+            val after = LiveLocation.pointsSince(latestOutbound.fixTimeMs)
             val seed =
                 dedupePoints(
-                    outbound.seedPoints +
-                        LonLat(outbound.lon, outbound.lat) +
+                    latestOutbound.seedPoints +
+                        LonLat(latestOutbound.lon, latestOutbound.lat) +
                         after,
                 )
             TrailBus.seed(created.id, seed)
@@ -515,7 +786,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     recent =
                         st.recent.map { item ->
                             if (item.id == localId) {
-                                item.copy(syncStatus = SyncStatus.Failed, outbound = outbound)
+                                item.copy(syncStatus = SyncStatus.Failed, outbound = latestOutbound)
                             } else {
                                 item
                             }

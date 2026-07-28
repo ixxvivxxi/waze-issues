@@ -3,7 +3,7 @@
 // @description     Show driving map reports from waze-issues.ster.by: speed-limit road signs and speed-bump markers; Done / Dismiss.
 // @namespace       https://github.com/ixxvivxxi/wme-scripts
 // @homepageURL     https://github.com/ixxvivxxi/waze-issues
-// @version         2026.07.26.006
+// @version         2026.07.28.001
 // @updateURL       https://raw.githubusercontent.com/ixxvivxxi/waze-issues/main/wme-waze-issues.user.js
 // @downloadURL     https://raw.githubusercontent.com/ixxvivxxi/waze-issues/main/wme-waze-issues.user.js
 // @match           https://www.waze.com/*/editor*
@@ -332,7 +332,12 @@
     if (r.issueType === 'speed_limit') {
       const kmh = r.payload && r.payload.valueKmh != null ? r.payload.valueKmh : '?';
       if (Number(kmh) === 0) return 'End of speed limit';
-      return String(kmh) + ' km/h';
+      let label = String(kmh) + ' km/h';
+      const lengthM = r.payload && r.payload.lengthM != null ? Number(r.payload.lengthM) : 0;
+      if (Number.isFinite(lengthM) && lengthM > 0) {
+        label += ' · ' + Math.round(lengthM) + ' m';
+      }
+      return label;
     }
     if (r.issueType === 'general') return 'General issue';
     if (r.issueType === 'speed_bump_remove') return 'Bump removed';

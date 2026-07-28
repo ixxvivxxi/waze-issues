@@ -14,6 +14,14 @@
     <string name="speed_limit_section">Ограничение скорости</string>
     <string name="add_note">Добавить заметку</string>
     <string name="description">Описание</string>
+    <string name="length_section">Длина ограничения</string>
+    <string name="length_meters">%1$d м</string>
+    <string name="length_unlimited">До знаков (∞)</string>
+    <string name="length_hint">0 м = до следующих знаков ограничения</string>
+    <string name="delete_report">Удалить отчёт</string>
+    <string name="report_deleted">Отчёт удалён</string>
+    <string name="report_delete_failed">Не удалось удалить отчёт</string>
+    <string name="note_saved_local">Сохранено локально — отправится после загрузки</string>
     <string name="nick_label">Ник (виден редакторам)</string>
     <string name="api_base_label">Базовый URL API</string>
     <string name="tap_to_add_note">Нажмите, чтобы добавить заметку</string>

@@ -33,7 +33,7 @@ async function bootstrap() {
     ) => {
       cb(null, isAllowedCorsOrigin(origin));
     },
-    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'OPTIONS'],
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
       'Access-Control-Request-Private-Network',

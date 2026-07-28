@@ -12,6 +12,7 @@ import {
   UpdateReportDto,
   assertSpeedPayload,
   bearingDegrees,
+  mergeReportPayload,
 } from './reports.dto';
 
 export type ReportDto = {
@@ -112,8 +113,24 @@ export class ReportsService {
     if (dto.status !== undefined) {
       row.status = dto.status;
     }
+    if (dto.payload !== undefined) {
+      try {
+        row.payload = mergeReportPayload(row.issueType, row.payload, dto.payload);
+      } catch (e) {
+        throw new BadRequestException(
+          e instanceof Error ? e.message : 'Invalid payload',
+        );
+      }
+    }
     const saved = await this.repo.save(row);
     return this.toDto(saved);
+  }
+
+  async remove(id: string): Promise<{ ok: true }> {
+    const row = await this.repo.findOne({ where: { id } });
+    if (!row) throw new NotFoundException('Report not found');
+    await this.repo.remove(row);
+    return { ok: true };
   }
 
   async bbox(params: {

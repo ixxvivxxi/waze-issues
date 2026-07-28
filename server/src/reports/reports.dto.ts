@@ -25,6 +25,20 @@ const ISSUE_TYPES: IssueType[] = [
 /** 0 = end of speed limit (отмена ограничения). */
 const SPEED_VALUES = [0, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120];
 
+/** Applicability length in meters; 0 = until signs (unlimited). */
+const LENGTH_VALUES: number[] = Array.from({ length: 21 }, (_, i) => i * 50);
+
+export function parseLengthM(raw: unknown): number | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  if (!LENGTH_VALUES.includes(n)) {
+    throw new Error(
+      `payload.lengthM must be in [${LENGTH_VALUES.join(', ')}] (0 = until signs)`,
+    );
+  }
+  return n;
+}
+
 export class CreateReportDto {
   @IsIn(ISSUE_TYPES)
   issueType!: IssueType;
@@ -89,6 +103,11 @@ export class UpdateReportDto {
   @IsOptional()
   @IsIn(['pending', 'done', 'dismissed'] as ReportStatus[])
   status?: ReportStatus;
+
+  /** Partial payload merge (e.g. lengthM for speed_limit). */
+  @IsOptional()
+  @IsObject()
+  payload?: Record<string, unknown>;
 }
 
 function attachAccuracyM(
@@ -117,7 +136,44 @@ export function assertSpeedPayload(
       `speed_limit requires payload.valueKmh in [${SPEED_VALUES.join(', ')}]`,
     );
   }
-  return attachAccuracyM(payload, { valueKmh });
+  const out: Record<string, unknown> = { valueKmh };
+  // End-of-limit is a point — length does not apply.
+  if (valueKmh !== 0) {
+    const lengthM = parseLengthM(payload?.lengthM);
+    out.lengthM = lengthM ?? 0;
+  }
+  return attachAccuracyM(payload, out);
+}
+
+/** Merge PATCH payload into an existing speed_limit / other report payload. */
+export function mergeReportPayload(
+  issueType: IssueType,
+  existing: Record<string, unknown> | null | undefined,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  const base = { ...(existing ?? {}) };
+  if (issueType !== 'speed_limit') {
+    return attachAccuracyM(patch, { ...base, ...patch });
+  }
+  const valueKmhRaw = patch.valueKmh !== undefined ? patch.valueKmh : base.valueKmh;
+  const valueKmh =
+    typeof valueKmhRaw === 'number' ? valueKmhRaw : Number(valueKmhRaw);
+  if (!SPEED_VALUES.includes(valueKmh)) {
+    throw new Error(
+      `speed_limit requires payload.valueKmh in [${SPEED_VALUES.join(', ')}]`,
+    );
+  }
+  const out: Record<string, unknown> = { ...base, valueKmh };
+  if (valueKmh === 0) {
+    delete out.lengthM;
+  } else if (patch.lengthM !== undefined) {
+    out.lengthM = parseLengthM(patch.lengthM) ?? 0;
+  } else if (typeof out.lengthM !== 'number') {
+    out.lengthM = 0;
+  } else {
+    out.lengthM = parseLengthM(out.lengthM) ?? 0;
+  }
+  return attachAccuracyM(patch, out);
 }
 
 export function bearingDegrees(

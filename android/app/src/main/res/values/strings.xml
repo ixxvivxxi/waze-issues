@@ -14,6 +14,14 @@
     <string name="speed_limit_section">Speed limit</string>
     <string name="add_note">Add note</string>
     <string name="description">Description</string>
+    <string name="length_section">Limit length</string>
+    <string name="length_meters">%1$d m</string>
+    <string name="length_unlimited">Until signs (∞)</string>
+    <string name="length_hint">0 m = until the next speed-limit signs</string>
+    <string name="delete_report">Delete report</string>
+    <string name="report_deleted">Report deleted</string>
+    <string name="report_delete_failed">Failed to delete report</string>
+    <string name="note_saved_local">Saved locally — will sync when uploaded</string>
     <string name="nick_label">Nick (shown to editors)</string>
     <string name="api_base_label">API base URL</string>
     <string name="tap_to_add_note">Tap to add note</string>

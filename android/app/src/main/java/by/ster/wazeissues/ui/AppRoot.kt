@@ -1,9 +1,11 @@
 package by.ster.wazeissues.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +28,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -51,7 +54,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import by.ster.wazeissues.AppLocales
 import by.ster.wazeissues.R
 import by.ster.wazeissues.location.LiveLocation
-
+import kotlin.math.roundToInt
 private val SpeedSignRed = Color(0xFFE30613)
 private val SpeedSignBg = Color(0xFFFFFFF8)
 private val SpeedSignText = Color(0xFF1A1A1A)
@@ -192,6 +195,7 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
                             SpeedLimitButton(
                                 kmh = kmh,
                                 onClick = { vm.reportSpeed(kmh) },
+                                onLongClick = { vm.reportSpeed(kmh, openLengthEditor = true) },
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -221,6 +225,8 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
                         Text(
                             when {
                                 item.description?.isNotBlank() == true -> item.description
+                                item.lengthM != null && item.lengthM > 0 ->
+                                    stringResource(R.string.length_meters, item.lengthM)
                                 item.syncStatus == SyncStatus.Failed ->
                                     stringResource(R.string.tap_to_retry)
                                 item.syncStatus == SyncStatus.Pending ->
@@ -412,10 +418,12 @@ private fun SpeedBumpIcon(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SpeedLimitButton(
     kmh: Int,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -423,7 +431,7 @@ private fun SpeedLimitButton(
             modifier
                 .aspectRatio(1f)
                 .clip(CircleShape)
-                .clickable(onClick = onClick),
+                .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -443,10 +451,10 @@ private fun SpeedLimitButton(
             Text(
                 text = "$kmh",
                 color = SpeedSignText,
-                fontSize = if (kmh >= 100) 12.sp else 14.sp,
+                fontSize = if (kmh >= 100) 18.sp else 22.sp,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
-                lineHeight = 14.sp,
+                lineHeight = if (kmh >= 100) 18.sp else 22.sp,
             )
         }
     }
@@ -626,8 +634,45 @@ private fun LanguageOption(
 
 @Composable
 private fun EditNoteScreen(state: UiState, vm: MainViewModel) {
+    val showLengthSlider =
+        state.editingIssueType == "speed_limit" && (state.editingValueKmh ?: 0) != 0
+    val lengthLabel =
+        if (state.editingLengthM == 0) {
+            stringResource(R.string.length_unlimited)
+        } else {
+            stringResource(R.string.length_meters, state.editingLengthM)
+        }
     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.add_note), style = MaterialTheme.typography.titleLarge)
+        Text(
+            state.editingLabel.ifBlank { stringResource(R.string.add_note) },
+            style = MaterialTheme.typography.titleLarge,
+        )
+        if (showLengthSlider) {
+            Text(
+                stringResource(R.string.length_section),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(
+                lengthLabel,
+                fontWeight = FontWeight.Medium,
+                fontSize = 15.sp,
+            )
+            Slider(
+                value = state.editingLengthM.toFloat(),
+                onValueChange = { vm.setEditingLengthM(it.roundToInt()) },
+                valueRange =
+                    MainViewModel.LENGTH_MIN_M.toFloat()..MainViewModel.LENGTH_MAX_M.toFloat(),
+                steps =
+                    (MainViewModel.LENGTH_MAX_M - MainViewModel.LENGTH_MIN_M) /
+                        MainViewModel.LENGTH_STEP_M - 1,
+                enabled = !state.busy,
+            )
+            Text(
+                stringResource(R.string.length_hint),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         OutlinedTextField(
             value = state.editingText,
             onValueChange = vm::setEditingText,
@@ -644,6 +689,16 @@ private fun EditNoteScreen(state: UiState, vm: MainViewModel) {
             TextButton(onClick = vm::closeEdit) {
                 Text(stringResource(R.string.cancel))
             }
+        }
+        TextButton(
+            onClick = vm::deleteEditingReport,
+            enabled = !state.busy,
+            colors =
+                ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error,
+                ),
+        ) {
+            Text(stringResource(R.string.delete_report))
         }
     }
 }
