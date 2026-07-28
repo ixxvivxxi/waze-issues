@@ -18,7 +18,11 @@
     <string name="length_meters">%1$d m</string>
     <string name="length_unlimited">Until signs (∞)</string>
     <string name="length_hint">0 m = until the next speed-limit signs</string>
-    <string name="delete_report">Delete report</string>
+    <string name="length_gesture_title">%1$d km/h — set length</string>
+    <string name="length_gesture_hint">Slide without lifting · release to save</string>
+    <string name="length_saved_unlimited">Saved: %1$d km/h · until signs</string>
+    <string name="length_saved_meters">Saved: %1$d km/h · %2$d m</string>
+    <string name="delete_report">Delete</string>
     <string name="report_deleted">Report deleted</string>
     <string name="report_delete_failed">Failed to delete report</string>
     <string name="note_saved_local">Saved locally — will sync when uploaded</string>

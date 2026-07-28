@@ -18,7 +18,11 @@
     <string name="length_meters">%1$d м</string>
     <string name="length_unlimited">Да знакаў (∞)</string>
     <string name="length_hint">0 м = да наступных знакаў абмежавання</string>
-    <string name="delete_report">Выдаліць справаздачу</string>
+    <string name="length_gesture_title">%1$d км/г — даўжыня</string>
+    <string name="length_gesture_hint">Вядзіце, не адпускаючы · адпусціце, каб захаваць</string>
+    <string name="length_saved_unlimited">Захавана: %1$d км/г · да знакаў</string>
+    <string name="length_saved_meters">Захавана: %1$d км/г · %2$d м</string>
+    <string name="delete_report">Выдаліць</string>
     <string name="report_deleted">Справаздачу выдалена</string>
     <string name="report_delete_failed">Не ўдалося выдаліць справаздачу</string>
     <string name="note_saved_local">Захавана лакальна — адправіцца пасля загрузкі</string>

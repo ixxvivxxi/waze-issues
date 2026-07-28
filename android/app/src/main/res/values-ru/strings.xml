@@ -18,7 +18,11 @@
     <string name="length_meters">%1$d м</string>
     <string name="length_unlimited">До знаков (∞)</string>
     <string name="length_hint">0 м = до следующих знаков ограничения</string>
-    <string name="delete_report">Удалить отчёт</string>
+    <string name="length_gesture_title">%1$d км/ч — длина</string>
+    <string name="length_gesture_hint">Ведите, не отпуская · отпустите, чтобы сохранить</string>
+    <string name="length_saved_unlimited">Сохранено: %1$d км/ч · до знаков</string>
+    <string name="length_saved_meters">Сохранено: %1$d км/ч · %2$d м</string>
+    <string name="delete_report">Удалить</string>
     <string name="report_deleted">Отчёт удалён</string>
     <string name="report_delete_failed">Не удалось удалить отчёт</string>
     <string name="note_saved_local">Сохранено локально — отправится после загрузки</string>

@@ -1,11 +1,15 @@
 package by.ster.wazeissues.ui
 
-import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.foundation.gestures.drag
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +48,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,6 +64,7 @@ import by.ster.wazeissues.AppLocales
 import by.ster.wazeissues.R
 import by.ster.wazeissues.location.LiveLocation
 import kotlin.math.roundToInt
+
 private val SpeedSignRed = Color(0xFFE30613)
 private val SpeedSignBg = Color(0xFFFFFFF8)
 private val SpeedSignText = Color(0xFF1A1A1A)
@@ -78,6 +88,13 @@ private fun gpsStatusText(state: UiState): String {
 @Composable
 fun AppRoot(vm: MainViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
+    // Predictive back / system back should dismiss nested screens, not the activity.
+    BackHandler(enabled = state.editingId != null) {
+        vm.closeEdit()
+    }
+    BackHandler(enabled = state.settingsReady && state.showSettings && state.editingId == null) {
+        vm.openSettings(false)
+    }
     MaterialTheme {
         Surface(Modifier.fillMaxSize()) {
             // targetSdk 35 draws edge-to-edge; keep chrome clear of status/nav bars
@@ -177,8 +194,16 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
             style = MaterialTheme.typography.titleSmall,
             modifier = Modifier.padding(bottom = 4.dp),
         )
+        state.lengthGesture?.let { gesture ->
+            LengthGestureBanner(gesture = gesture)
+            Spacer(Modifier.height(6.dp))
+        }
         // 0 = end of speed limit
         val speeds = listOf(20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 0)
+        val density = LocalDensity.current
+        val screenWidthPx =
+            with(density) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
+        val edgePadPx = with(density) { 24.dp.toPx() }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             speeds.chunked(6).forEach { row ->
                 Row(
@@ -195,7 +220,16 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
                             SpeedLimitButton(
                                 kmh = kmh,
                                 onClick = { vm.reportSpeed(kmh) },
-                                onLongClick = { vm.reportSpeed(kmh, openLengthEditor = true) },
+                                onLengthGestureStart = { vm.beginLengthGesture(kmh) },
+                                onLengthGestureUpdate = { xRoot ->
+                                    val usable = (screenWidthPx - 2 * edgePadPx).coerceAtLeast(1f)
+                                    val t = ((xRoot - edgePadPx) / usable).coerceIn(0f, 1f)
+                                    val meters =
+                                        (t * MainViewModel.LENGTH_MAX_M / MainViewModel.LENGTH_STEP_M)
+                                            .roundToInt() * MainViewModel.LENGTH_STEP_M
+                                    vm.updateLengthGesture(meters)
+                                },
+                                onLengthGestureEnd = { vm.finishLengthGesture() },
                                 modifier = Modifier.weight(1f),
                             )
                         }
@@ -418,20 +452,100 @@ private fun SpeedBumpIcon(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun LengthGestureBanner(gesture: LengthGesture) {
+    val lengthLabel =
+        if (gesture.lengthM == 0) {
+            stringResource(R.string.length_unlimited)
+        } else {
+            stringResource(R.string.length_meters, gesture.lengthM)
+        }
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Text(
+                stringResource(R.string.length_gesture_title, gesture.kmh),
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.sp,
+            )
+            Text(
+                lengthLabel,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+            // Visual-only track (finger still owned by the speed-sign gesture).
+            Slider(
+                value = gesture.lengthM.toFloat(),
+                onValueChange = {},
+                valueRange =
+                    MainViewModel.LENGTH_MIN_M.toFloat()..MainViewModel.LENGTH_MAX_M.toFloat(),
+                steps =
+                    (MainViewModel.LENGTH_MAX_M - MainViewModel.LENGTH_MIN_M) /
+                        MainViewModel.LENGTH_STEP_M - 1,
+                enabled = false,
+                modifier = Modifier.padding(horizontal = 8.dp),
+            )
+            Text(
+                stringResource(R.string.length_gesture_hint),
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.85f),
+            )
+        }
+    }
+}
+
 @Composable
 private fun SpeedLimitButton(
     kmh: Int,
     onClick: () -> Unit,
-    onLongClick: () -> Unit,
+    onLengthGestureStart: () -> Boolean,
+    onLengthGestureUpdate: (rootX: Float) -> Unit,
+    onLengthGestureEnd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var coords by remember { mutableStateOf<LayoutCoordinates?>(null) }
     Box(
         modifier =
             modifier
                 .aspectRatio(1f)
                 .clip(CircleShape)
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+                .onGloballyPositioned { coords = it }
+                .pointerInput(kmh) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val longPress = awaitLongPressOrCancellation(down.id)
+                        if (longPress == null) {
+                            val stillDown =
+                                currentEvent.changes.any { it.id == down.id && it.pressed }
+                            if (stillDown) {
+                                // Moved before long-press — ignore (don't fire a tap).
+                                waitForUpOrCancellation(down.id)
+                            } else {
+                                onClick()
+                            }
+                            return@awaitEachGesture
+                        }
+                        if (!onLengthGestureStart()) {
+                            waitForUpOrCancellation(longPress.id)
+                            return@awaitEachGesture
+                        }
+                        fun emitFrom(local: Offset) {
+                            val rootX = coords?.localToRoot(local)?.x ?: local.x
+                            onLengthGestureUpdate(rootX)
+                        }
+                        emitFrom(longPress.position)
+                        drag(longPress.id) { change ->
+                            emitFrom(change.position)
+                            change.consume()
+                        }
+                        // Finger up or cancel — keep the report with the last length.
+                        onLengthGestureEnd()
+                    }
+                },
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -643,10 +757,27 @@ private fun EditNoteScreen(state: UiState, vm: MainViewModel) {
             stringResource(R.string.length_meters, state.editingLengthM)
         }
     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            state.editingLabel.ifBlank { stringResource(R.string.add_note) },
-            style = MaterialTheme.typography.titleLarge,
-        )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                state.editingLabel.ifBlank { stringResource(R.string.add_note) },
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(
+                onClick = vm::deleteEditingReport,
+                enabled = !state.busy,
+                colors =
+                    ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error,
+                    ),
+            ) {
+                Text(stringResource(R.string.delete_report))
+            }
+        }
         if (showLengthSlider) {
             Text(
                 stringResource(R.string.length_section),
@@ -666,6 +797,7 @@ private fun EditNoteScreen(state: UiState, vm: MainViewModel) {
                     (MainViewModel.LENGTH_MAX_M - MainViewModel.LENGTH_MIN_M) /
                         MainViewModel.LENGTH_STEP_M - 1,
                 enabled = !state.busy,
+                modifier = Modifier.padding(horizontal = 12.dp),
             )
             Text(
                 stringResource(R.string.length_hint),
@@ -689,16 +821,6 @@ private fun EditNoteScreen(state: UiState, vm: MainViewModel) {
             TextButton(onClick = vm::closeEdit) {
                 Text(stringResource(R.string.cancel))
             }
-        }
-        TextButton(
-            onClick = vm::deleteEditingReport,
-            enabled = !state.busy,
-            colors =
-                ButtonDefaults.textButtonColors(
-                    contentColor = MaterialTheme.colorScheme.error,
-                ),
-        ) {
-            Text(stringResource(R.string.delete_report))
         }
     }
 }

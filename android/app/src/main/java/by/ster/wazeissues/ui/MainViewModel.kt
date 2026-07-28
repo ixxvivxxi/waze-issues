@@ -76,6 +76,13 @@ data class UpdateInfo(
     val apkUrl: String,
 )
 
+/** In-progress long-press length selection on a speed sign (no edit screen). */
+data class LengthGesture(
+    val reportId: String,
+    val kmh: Int,
+    val lengthM: Int,
+)
+
 data class UiState(
     val nick: String = "",
     val apiBase: String = "",
@@ -91,6 +98,7 @@ data class UiState(
     val editingValueKmh: Int? = null,
     val editingLengthM: Int = 0,
     val editingLabel: String = "",
+    val lengthGesture: LengthGesture? = null,
     /** Current GPS horizontal accuracy in meters; null if no fix yet. */
     val gpsAccuracyM: Float? = null,
     val gpsAgeMs: Long? = null,
@@ -114,9 +122,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Local ids discarded by the user before/while upload — DELETE after sync. */
     private val discardAfterUpload = mutableSetOf<String>()
-
-    /** Local ids that should open the editor as soon as the report is queued. */
-    private val openEditAfterQueue = mutableSetOf<String>()
 
     private fun str(resId: Int): String = getApplication<Application>().getString(resId)
 
@@ -509,7 +514,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    fun reportSpeed(kmh: Int, openLengthEditor: Boolean = false) {
+    fun reportSpeed(kmh: Int) {
         sendReport(
             issueType = "speed_limit",
             label =
@@ -520,8 +525,82 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 },
             valueKmh = kmh,
             lengthM = if (kmh == 0) null else 0,
-            openLengthEditor = openLengthEditor && kmh != 0,
         )
+    }
+
+    /**
+     * Long-press on a speed sign: queue the report and start an in-place length gesture.
+     * Returns false if GPS/settings blocked the report (caller should abort the gesture).
+     */
+    fun beginLengthGesture(kmh: Int): Boolean {
+        if (kmh == 0) return false
+        if (_state.value.lengthGesture != null) return false
+        val id =
+            sendReport(
+                issueType = "speed_limit",
+                label = str(R.string.label_speed_kmh, kmh),
+                valueKmh = kmh,
+                lengthM = 0,
+                returnLocalId = true,
+            ) ?: return false
+        _state.update {
+            it.copy(lengthGesture = LengthGesture(reportId = id, kmh = kmh, lengthM = 0))
+        }
+        return true
+    }
+
+    fun updateLengthGesture(meters: Int) {
+        val g = _state.value.lengthGesture ?: return
+        val snapped =
+            (meters.coerceIn(LENGTH_MIN_M, LENGTH_MAX_M) / LENGTH_STEP_M) * LENGTH_STEP_M
+        if (snapped == g.lengthM) return
+        _state.update { s ->
+            s.copy(
+                lengthGesture = g.copy(lengthM = snapped),
+                recent =
+                    s.recent.map { item ->
+                        if (item.id != g.reportId) {
+                            item
+                        } else {
+                            item.copy(
+                                lengthM = snapped,
+                                outbound = item.outbound?.copy(lengthM = snapped),
+                            )
+                        }
+                    },
+            )
+        }
+    }
+
+    fun finishLengthGesture() {
+        val g = _state.value.lengthGesture ?: return
+        val item = _state.value.recent.firstOrNull { it.id == g.reportId }
+        _state.update {
+            it.copy(
+                lengthGesture = null,
+                statusMessage =
+                    if (g.lengthM == 0) {
+                        str(R.string.length_saved_unlimited, g.kmh)
+                    } else {
+                        str(R.string.length_saved_meters, g.kmh, g.lengthM)
+                    },
+            )
+        }
+        vibrate()
+        if (item?.syncStatus == SyncStatus.Synced) {
+            viewModelScope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        api.patchReport(id = g.reportId, lengthM = g.lengthM)
+                    }
+                } catch (_: Exception) {
+                }
+            }
+        }
+    }
+
+    fun cancelLengthGesture() {
+        _state.update { it.copy(lengthGesture = null) }
     }
 
     fun reportGeneral() {
@@ -533,19 +612,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
+    /**
+     * @param returnLocalId when true, returns the queued local id (or null on failure)
+     *   instead of Unit-style fire-and-forget.
+     */
     private fun sendReport(
         issueType: String,
         label: String,
         valueKmh: Int?,
         lengthM: Int?,
-        openLengthEditor: Boolean = false,
-    ) {
+        returnLocalId: Boolean = false,
+    ): String? {
         val s = _state.value
         if (!s.settingsReady) {
             _state.update {
                 it.copy(statusMessage = str(R.string.need_nick), showSettings = true)
             }
-            return
+            return null
         }
 
         // Capture GPS at tap time — do not wait for network.
@@ -553,7 +636,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             LiveLocation.snapshotForReport()
                 ?: run {
                     _state.update { it.copy(statusMessage = str(R.string.no_gps)) }
-                    return
+                    return null
                 }
         val seedBefore = LiveLocation.recentPoints(12_000L)
 
@@ -585,27 +668,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val accHint =
             fix.accuracyM?.let { str(R.string.queued_with_accuracy, label, it.toInt()) }
                 ?: str(R.string.queued, label)
-        if (openLengthEditor) {
-            openEditAfterQueue += localId
-        }
         _state.update {
-            var next =
-                it.copy(
-                    recent = (listOf(pending) + it.recent).take(30),
-                    statusMessage = accHint,
-                )
-            if (openLengthEditor) {
-                next =
-                    next.copy(
-                        editingId = localId,
-                        editingText = "",
-                        editingIssueType = issueType,
-                        editingValueKmh = valueKmh,
-                        editingLengthM = lengthM ?: 0,
-                        editingLabel = label,
-                    )
-            }
-            next
+            it.copy(
+                recent = (listOf(pending) + it.recent).take(30),
+                statusMessage = accHint,
+            )
         }
         vibrate()
 
@@ -616,6 +683,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 flushFailedReports()
             }
         }
+        return if (returnLocalId) localId else null
     }
 
     /**
@@ -711,9 +779,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 return true
             }
 
-            openEditAfterQueue.remove(localId)
             val localItem = _state.value.recent.firstOrNull { it.id == localId }
             val editingHere = _state.value.editingId == localId
+            val gestureHere = _state.value.lengthGesture?.takeIf { it.reportId == localId }
             val finalDesc =
                 when {
                     editingHere && _state.value.editingText.isNotBlank() ->
@@ -725,6 +793,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 when {
                     latestOutbound.issueType != "speed_limit" ||
                         (latestOutbound.valueKmh ?: 0) == 0 -> null
+                    gestureHere != null -> gestureHere.lengthM
                     editingHere -> _state.value.editingLengthM
                     else -> localItem?.lengthM ?: latestOutbound.lengthM ?: 0
                 }
@@ -750,6 +819,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 st.copy(
                     statusMessage = str(R.string.sent, label),
                     editingId = if (st.editingId == localId) created.id else st.editingId,
+                    lengthGesture =
+                        st.lengthGesture?.let { g ->
+                            if (g.reportId == localId) g.copy(reportId = created.id) else g
+                        },
                     recent =
                         st.recent.map { item ->
                             if (item.id == localId) {
