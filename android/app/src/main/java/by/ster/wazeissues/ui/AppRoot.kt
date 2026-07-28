@@ -9,7 +9,6 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.drag
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +47,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.input.pointer.awaitPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -523,14 +523,22 @@ private fun SpeedLimitButton(
                                 currentEvent.changes.any { it.id == down.id && it.pressed }
                             if (stillDown) {
                                 // Moved before long-press — ignore (don't fire a tap).
-                                waitForUpOrCancellation(down.id)
+                                do {
+                                    val event = awaitPointerEvent()
+                                    val change =
+                                        event.changes.firstOrNull { it.id == down.id } ?: break
+                                } while (change.pressed)
                             } else {
                                 onClick()
                             }
                             return@awaitEachGesture
                         }
                         if (!onLengthGestureStart()) {
-                            waitForUpOrCancellation(longPress.id)
+                            do {
+                                val event = awaitPointerEvent()
+                                val change =
+                                    event.changes.firstOrNull { it.id == longPress.id } ?: break
+                            } while (change.pressed)
                             return@awaitEachGesture
                         }
                         fun emitFrom(local: Offset) {
