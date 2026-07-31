@@ -1,5 +1,7 @@
 package by.ster.wazeissues.ui
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -26,6 +28,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +54,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -59,8 +63,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.app.Activity
 import by.ster.wazeissues.AppLocales
 import by.ster.wazeissues.R
+import by.ster.wazeissues.bubble.BubbleExpandDirection
+import by.ster.wazeissues.bubble.BubbleLauncher
 import by.ster.wazeissues.location.LiveLocation
 import kotlin.math.roundToInt
 
@@ -116,8 +123,37 @@ fun AppRoot(vm: MainViewModel = viewModel()) {
 
 @Composable
 private fun MainScreen(state: UiState, vm: MainViewModel) {
+    val context = LocalContext.current
+    var showOverlayHelp by remember { mutableStateOf(false) }
     val nickShown =
         state.nick.ifBlank { stringResource(R.string.nick_placeholder) }
+    if (showOverlayHelp) {
+        AlertDialog(
+            onDismissRequest = { showOverlayHelp = false },
+            title = { Text(stringResource(R.string.bubble_restricted_title)) },
+            text = { Text(stringResource(R.string.bubble_restricted_body)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showOverlayHelp = false
+                        BubbleLauncher.openAppInfo(context)
+                    },
+                ) {
+                    Text(stringResource(R.string.bubble_open_app_info))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showOverlayHelp = false
+                        BubbleLauncher.openOverlaySettings(context)
+                    },
+                ) {
+                    Text(stringResource(R.string.bubble_open_overlay_settings))
+                }
+            },
+        )
+    }
     Column(
         Modifier
             .fillMaxSize()
@@ -132,8 +168,23 @@ private fun MainScreen(state: UiState, vm: MainViewModel) {
                 stringResource(R.string.app_name),
                 style = MaterialTheme.typography.titleMedium,
             )
-            TextButton(onClick = { vm.openSettings(true) }) {
-                Text(stringResource(R.string.settings))
+            Row {
+                TextButton(
+                    onClick = {
+                        if (BubbleLauncher.canDrawOverlays(context)) {
+                            if (BubbleLauncher.start(context)) {
+                                (context as? Activity)?.moveTaskToBack(true)
+                            }
+                        } else {
+                            showOverlayHelp = true
+                        }
+                    },
+                ) {
+                    Text(stringResource(R.string.bubble_start))
+                }
+                TextButton(onClick = { vm.openSettings(true) }) {
+                    Text(stringResource(R.string.settings))
+                }
             }
         }
         state.updateAvailable?.let { update ->
@@ -664,7 +715,12 @@ private fun UpdateBanner(
 private fun SettingsScreen(state: UiState, vm: MainViewModel) {
     var nick by remember(state.nick) { mutableStateOf(state.nick) }
     var apiBase by remember(state.apiBase) { mutableStateOf(state.apiBase) }
-    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(
+        Modifier
+            .padding(12.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Text(stringResource(R.string.settings), style = MaterialTheme.typography.titleLarge)
         Text(
             stringResource(R.string.language_label),
@@ -686,10 +742,21 @@ private fun SettingsScreen(state: UiState, vm: MainViewModel) {
                 onClick = { vm.setLanguage(AppLocales.RU) },
                 modifier = Modifier.weight(1f),
             )
+        }
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
             LanguageOption(
                 label = "Беларуская",
                 selected = state.language == AppLocales.BE,
                 onClick = { vm.setLanguage(AppLocales.BE) },
+                modifier = Modifier.weight(1f),
+            )
+            LanguageOption(
+                label = "Українська",
+                selected = state.language == AppLocales.UK,
+                onClick = { vm.setLanguage(AppLocales.UK) },
                 modifier = Modifier.weight(1f),
             )
         }
@@ -707,6 +774,42 @@ private fun SettingsScreen(state: UiState, vm: MainViewModel) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        Text(
+            stringResource(R.string.bubble_expand_label),
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            listOf(
+                BubbleExpandDirection.Up to R.string.bubble_expand_up,
+                BubbleExpandDirection.Down to R.string.bubble_expand_down,
+            ).forEach { (dir, labelRes) ->
+                LanguageOption(
+                    label = stringResource(labelRes),
+                    selected = state.bubbleExpand == dir,
+                    onClick = { vm.setBubbleExpand(dir) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            listOf(
+                BubbleExpandDirection.Left to R.string.bubble_expand_left,
+                BubbleExpandDirection.Right to R.string.bubble_expand_right,
+            ).forEach { (dir, labelRes) ->
+                LanguageOption(
+                    label = stringResource(labelRes),
+                    selected = state.bubbleExpand == dir,
+                    onClick = { vm.setBubbleExpand(dir) },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { vm.saveSettings(nick, apiBase) }) {
                 Text(stringResource(R.string.save))

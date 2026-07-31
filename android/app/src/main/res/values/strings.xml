@@ -73,4 +73,22 @@
     <string name="update_installing">Opening installer…</string>
     <string name="update_download_failed">Update download failed</string>
     <string name="update_allow_unknown">Allow installing this app, then tap Update again</string>
+
+    <string name="bubble_start">Bubble</string>
+    <string name="bubble_open_app">App</string>
+    <string name="bubble_close_menu">Close</string>
+    <string name="bubble_need_overlay">Allow “Display over other apps” for the bubble</string>
+    <string name="bubble_restricted_title">Allow overlay (sideload)</string>
+    <string name="bubble_restricted_body">Android blocks “Display over other apps” for APKs installed outside the Play Store until you unlock it:\n\n1. Open App info (button below)\n2. Tap ⋮ (top right) → Allow restricted settings\n3. Confirm with PIN/fingerprint\n4. Then enable Display over other apps\n\nAfter that, tap Bubble again.</string>
+    <string name="bubble_open_app_info">App info</string>
+    <string name="bubble_open_overlay_settings">Overlay settings</string>
+    <string name="bubble_channel">Floating reporter</string>
+    <string name="bubble_notification_title">Bubble reporter active</string>
+    <string name="bubble_notification_text">Tap notification to open the app</string>
+    <string name="bubble_stop">Stop bubble</string>
+    <string name="bubble_expand_label">Bubble opens</string>
+    <string name="bubble_expand_up">Up</string>
+    <string name="bubble_expand_down">Down</string>
+    <string name="bubble_expand_left">Left</string>
+    <string name="bubble_expand_right">Right</string>
 </resources>

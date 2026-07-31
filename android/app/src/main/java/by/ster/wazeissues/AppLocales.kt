@@ -7,8 +7,9 @@ object AppLocales {
     const val EN = "en"
     const val RU = "ru"
     const val BE = "be"
+    const val UK = "uk"
 
-    val supported = listOf(EN, RU, BE)
+    val supported = listOf(EN, RU, BE, UK)
 
     fun apply(tag: String) {
         val normalized = tag.takeIf { it in supported } ?: EN

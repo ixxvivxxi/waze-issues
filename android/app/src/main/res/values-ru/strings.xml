@@ -73,4 +73,22 @@
     <string name="update_installing">Открытие установщика…</string>
     <string name="update_download_failed">Не удалось скачать обновление</string>
     <string name="update_allow_unknown">Разрешите установку этого приложения и снова нажмите «Обновить»</string>
+
+    <string name="bubble_start">Пузырь</string>
+    <string name="bubble_open_app">Приложение</string>
+    <string name="bubble_close_menu">Закрыть</string>
+    <string name="bubble_need_overlay">Разрешите «Поверх других приложений» для пузыря</string>
+    <string name="bubble_restricted_title">Разрешить оверлей (APK)</string>
+    <string name="bubble_restricted_body">Android блокирует «Поверх других приложений» для приложений не из Play Store, пока вы не разблокируете ограничение:\n\n1. Откройте «О приложении» (кнопка ниже)\n2. Меню ⋮ справа сверху → «Разрешить ограниченный доступ» / Allow restricted settings\n3. Подтвердите PIN/отпечаток\n4. Затем включите «Поверх других приложений»\n\nПосле этого снова нажмите «Пузырь».</string>
+    <string name="bubble_open_app_info">О приложении</string>
+    <string name="bubble_open_overlay_settings">Настройка оверлея</string>
+    <string name="bubble_channel">Плавающий репортёр</string>
+    <string name="bubble_notification_title">Пузырь активен</string>
+    <string name="bubble_notification_text">Нажмите уведомление, чтобы открыть приложение</string>
+    <string name="bubble_stop">Остановить пузырь</string>
+    <string name="bubble_expand_label">Пузырь открывается</string>
+    <string name="bubble_expand_up">Вверх</string>
+    <string name="bubble_expand_down">Вниз</string>
+    <string name="bubble_expand_left">Влево</string>
+    <string name="bubble_expand_right">Вправо</string>
 </resources>

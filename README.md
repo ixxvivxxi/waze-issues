@@ -5,8 +5,9 @@ Phone → server → database tool for flagging Waze map problems while driving 
 | Piece | Path | Role |
 |-------|------|------|
 | API | [`server/`](server/) | NestJS + Postgres; stores location, trajectory, heading |
-| Android | [`android/`](android/) | Split-screen one-tap reporter |
+| Android | [`android/`](android/) | Full-screen + floating bubble reporter |
 | Deploy | [`deploy/`](deploy/) | Docker Compose on VPS + nginx snippets |
+| Agents | [`AGENTS.md`](AGENTS.md) | Architecture & conventions for AI / contributors |
 
 **Production API:** `https://waze-issues.ster.by` (configurable in the app; domain may change)  
 **APK / updates:** [GitHub Releases `android-latest`](https://github.com/ixxvivxxi/waze-issues/releases/tag/android-latest) (`waze-issues-<version>.apk`)  
@@ -80,6 +81,11 @@ Manual deploy: `cd ~/waze-issues/deploy && ./deploy.sh`
 
 Default API base: `https://waze-issues.ster.by` (change anytime in **Settings** — updates do not use this domain).
 
+Modes:
+
+- **Full app** — split-screen friendly UI (bumps, general, speed grid, recent notes).
+- **Bubble** — floating overlay over Waze (`SYSTEM_ALERT_WINDOW`). Tap hub → freeze GPS → arc actions; speed opens the same tap / long-press length flow. Switch via **Bubble** in the app header or **App** on the overlay.
+
 In-app update check reads:
 `https://github.com/ixxvivxxi/waze-issues/releases/download/android-latest/version.json`
 
@@ -89,6 +95,8 @@ In-app update check reads:
 ```
 
 Bump `versionCode` in `android/app/build.gradle.kts` on each published build.
+
+For architecture details (shared `ReportController`, bubble package, build gotchas), see [`AGENTS.md`](AGENTS.md).
 
 ## WME userscript
 

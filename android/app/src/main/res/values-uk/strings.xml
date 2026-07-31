@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Waze Issues</string>
+    <string name="notification_channel">Відстеження місцезнаходження</string>
+    <string name="notification_title">Запис траєкторії звіту</string>
+    <string name="notification_text">GPS активний для напрямку</string>
+
+    <string name="settings">Налаштування</string>
+    <string name="language_label">Мова</string>
+    <string name="save">Зберегти</string>
+    <string name="back">Назад</string>
+    <string name="cancel">Скасувати</string>
+    <string name="recent">Недавні</string>
+    <string name="speed_limit_section">Обмеження швидкості</string>
+    <string name="add_note">Додати нотатку</string>
+    <string name="description">Опис</string>
+    <string name="length_section">Довжина обмеження</string>
+    <string name="length_meters">%1$d м</string>
+    <string name="length_unlimited">До знаків (∞)</string>
+    <string name="length_hint">0 м = до наступних знаків обмеження</string>
+    <string name="length_gesture_title">%1$d км/год — довжина</string>
+    <string name="length_gesture_hint">Ведіть, не відпускаючи · відпустіть, щоб зберегти</string>
+    <string name="length_saved_unlimited">Збережено: %1$d км/год · до знаків</string>
+    <string name="length_saved_meters">Збережено: %1$d км/год · %2$d м</string>
+    <string name="delete_report">Видалити</string>
+    <string name="report_deleted">Звіт видалено</string>
+    <string name="report_delete_failed">Не вдалося видалити звіт</string>
+    <string name="note_saved_local">Збережено локально — надішлеться після завантаження</string>
+    <string name="nick_label">Нік (видимий редакторам)</string>
+    <string name="api_base_label">Базовий URL API</string>
+    <string name="tap_to_add_note">Натисніть, щоб додати нотатку</string>
+    <string name="status_idle">Натисніть, щоб позначити · нік: %1$s</string>
+    <string name="nick_placeholder">—</string>
+    <string name="loading">Завантаження…</string>
+    <string name="gps_searching">GPS: пошук…</string>
+    <string name="gps_accuracy">Точність GPS: ±%1$d м</string>
+    <string name="gps_stale">GPS застарів (±%1$d м) — зачекайте</string>
+    <string name="settings_required_hint">Вкажіть нік, щоб продовжити</string>
+    <string name="queued_with_accuracy">У черзі: %1$s (±%2$d м)</string>
+
+    <string name="bump_add">Додати</string>
+    <string name="bump_remove">Прибрати</string>
+    <string name="speed_bump">лежачий поліцейський</string>
+    <string name="general_issue">Загальна проблема</string>
+    <string name="general_issue_hint">Подробиці пізніше в «Недавні»</string>
+
+    <string name="label_bump_add">Лежачий +</string>
+    <string name="label_bump_remove">Лежачий −</string>
+    <string name="label_speed_kmh">%1$d км/год</string>
+    <string name="label_speed_end">Кінець обмеження</string>
+    <string name="label_general">Загальна проблема</string>
+
+    <string name="settings_saved">Налаштування збережено</string>
+    <string name="note_saved">Нотатку збережено</string>
+    <string name="note_save_failed">Не вдалося зберегти нотатку</string>
+    <string name="need_nick">Спочатку вкажіть нік у Налаштуваннях</string>
+    <string name="queued">У черзі: %1$s</string>
+    <string name="wait_until_synced">Дочекайтеся завантаження, щоб додати нотатку</string>
+    <string name="tap_to_retry">Не надіслано — натисніть, щоб повторити</string>
+    <string name="sync_pending_hint">Надсилання…</string>
+    <string name="retrying">Повтор: %1$s</string>
+    <string name="sent">Надіслано: %1$s</string>
+    <string name="send_failed">Помилка надсилання</string>
+    <string name="trail_too_short">Траєкторія занадто коротка для напрямку</string>
+    <string name="direction_saved">Напрямок збережено (%1$d°)</string>
+    <string name="trail_upload_failed">Не вдалося надіслати траєкторію: %1$s</string>
+    <string name="no_gps">Немає GPS — зачекайте трохи і спробуйте знову</string>
+
+    <string name="update_available">Доступна нова версія: %1$s</string>
+    <string name="update_download">Оновити</string>
+    <string name="update_later">Пізніше</string>
+    <string name="update_downloading">Завантаження оновлення…</string>
+    <string name="update_installing">Відкриття встановлювача…</string>
+    <string name="update_download_failed">Не вдалося завантажити оновлення</string>
+    <string name="update_allow_unknown">Дозвольте встановлення цього застосунку і знову натисніть «Оновити»</string>
+
+    <string name="bubble_start">Бульбашка</string>
+    <string name="bubble_open_app">Застосунок</string>
+    <string name="bubble_close_menu">Закрити</string>
+    <string name="bubble_need_overlay">Дозвольте «Поверх інших застосунків» для бульбашки</string>
+    <string name="bubble_restricted_title">Дозволити оверлей (APK)</string>
+    <string name="bubble_restricted_body">Android блокує «Поверх інших застосунків» для застосунків не з Play Store, доки ви не розблокуєте обмеження:\n\n1. Відкрийте «Про застосунок» (кнопка нижче)\n2. Меню ⋮ справа зверху → «Дозволити обмежені налаштування» / Allow restricted settings\n3. Підтвердіть PIN/відбиток\n4. Потім увімкніть «Поверх інших застосунків»\n\nПісля цього знову натисніть «Бульбашка».</string>
+    <string name="bubble_open_app_info">Про застосунок</string>
+    <string name="bubble_open_overlay_settings">Налаштування оверлею</string>
+    <string name="bubble_channel">Плаваючий репортер</string>
+    <string name="bubble_notification_title">Бульбашка активна</string>
+    <string name="bubble_notification_text">Натисніть сповіщення, щоб відкрити застосунок</string>
+    <string name="bubble_stop">Зупинити бульбашку</string>
+    <string name="bubble_expand_label">Бульбашка відкривається</string>
+    <string name="bubble_expand_up">Вгору</string>
+    <string name="bubble_expand_down">Вниз</string>
+    <string name="bubble_expand_left">Вліво</string>
+    <string name="bubble_expand_right">Вправо</string>
+</resources>

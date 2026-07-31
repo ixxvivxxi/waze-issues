@@ -55,6 +55,7 @@ class LocationTrailService : Service() {
                 val nextId = intent?.getStringExtra(EXTRA_REPORT_ID) ?: return START_NOT_STICKY
                 flushCurrentTrail()
                 reportId = nextId
+                TrailBus.activeReportId = nextId
                 val seed = TrailBus.takeSeed(nextId)
                 points.clear()
                 points.addAll(seed)
@@ -128,6 +129,10 @@ object TrailBus {
     @Volatile
     var onFinished: ((reportId: String, points: List<LonLat>) -> Unit)? = null
 
+    /** Report currently being trailed by [LocationTrailService], if any. */
+    @Volatile
+    var activeReportId: String? = null
+
     private val seeds = ConcurrentHashMap<String, List<LonLat>>()
 
     fun seed(reportId: String, points: List<LonLat>) {
@@ -139,6 +144,7 @@ object TrailBus {
     fun publish(@Suppress("UNUSED_PARAMETER") points: List<LonLat>) {}
 
     fun finish(reportId: String, points: List<LonLat>) {
+        if (activeReportId == reportId) activeReportId = null
         onFinished?.invoke(reportId, points)
     }
 }

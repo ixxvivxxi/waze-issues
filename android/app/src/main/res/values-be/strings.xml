@@ -73,4 +73,22 @@
     <string name="update_installing">Адкрыццё ўсталёўшчыка…</string>
     <string name="update_download_failed">Не ўдалося спампаваць абнаўленне</string>
     <string name="update_allow_unknown">Дазвольце ўстаноўку гэтага прыкладання і зноў націсніце «Абнавіць»</string>
+
+    <string name="bubble_start">Бурбалка</string>
+    <string name="bubble_open_app">Праграма</string>
+    <string name="bubble_close_menu">Закрыць</string>
+    <string name="bubble_need_overlay">Дазвольце «Паверх іншых праграм» для бурбалкі</string>
+    <string name="bubble_restricted_title">Дазволіць аверлей (APK)</string>
+    <string name="bubble_restricted_body">Android блакуе «Паверх іншых праграм» для праграм не з Play Store, пакуль вы не разблакуеце абмежаванне:\n\n1. Адкрыйце «Пра праграму» (кнопка ніжэй)\n2. Меню ⋮ справа зверху → «Дазволіць абмежаваны доступ» / Allow restricted settings\n3. Пацвердзіце PIN/адбітак\n4. Затым уключыце «Паверх іншых праграм»\n\nПасля гэтага зноў націсніце «Бурбалка».</string>
+    <string name="bubble_open_app_info">Пра праграму</string>
+    <string name="bubble_open_overlay_settings">Налады аверлея</string>
+    <string name="bubble_channel">Плывучы рэпарцёр</string>
+    <string name="bubble_notification_title">Бурбалка актыўная</string>
+    <string name="bubble_notification_text">Націсніце апавяшчэнне, каб адкрыць праграму</string>
+    <string name="bubble_stop">Спыніць бурбалку</string>
+    <string name="bubble_expand_label">Бурбалка адкрываецца</string>
+    <string name="bubble_expand_up">Уверх</string>
+    <string name="bubble_expand_down">Уніз</string>
+    <string name="bubble_expand_left">Улева</string>
+    <string name="bubble_expand_right">Управа</string>
 </resources>

@@ -1,0 +1,32 @@
+---
+description: waze-issues project context for AI agents (architecture, bubble, build, ops)
+alwaysApply: true
+---
+
+# waze-issues
+
+Read [`AGENTS.md`](AGENTS.md) for full agent context. Short must-knows:
+
+## Product
+
+Phone reporter (Compose + floating overlay) → Nest/Postgres → WME userscript review. Prod: `https://waze-issues.ster.by`. No API key.
+
+## Code ownership
+
+- Shared reporting: `ReportController` via `WazeIssuesApp.reports` — used by full UI **and** bubble.
+- `MainViewModel` is a thin wrapper only.
+- Bubble: `android/.../bubble/` (`BubbleLauncher`, `BubbleOverlayService`, `BubbleOverlayContent`).
+- Server reports: `server/src/reports/`. Userscript: `wme-waze-issues.user.js`.
+
+## When changing Android
+
+- Add UI strings to EN + RU + BE.
+- Publishing APK: bump `versionCode` / `versionName` / `DEFAULT_APK_URL` together; build with `./android/build-apk.sh`.
+- Prefer Docker builds; fix root-owned `android/.gradle` / `app/build` after Docker if local Gradle fails.
+- Do not duplicate upload/GPS/trail logic outside `ReportController`.
+- Overlay: never name a method `setPhase` beside `var phase by mutableStateOf`.
+
+## Git / secrets
+
+- No commit/push unless the user asks.
+- Never commit keystores, `deploy/.env.prod`, DB URLs/passwords, or paste prod secrets into chat.
