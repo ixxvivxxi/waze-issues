@@ -1,0 +1,316 @@
+/** Stats page for GET /stats. Keep in sync with deploy/public/stats.html. */
+export const STATS_PAGE_HTML = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Waze Issues — Stats</title>
+    <style>
+      :root {
+        --bg: #0f1419;
+        --panel: #1a222c;
+        --text: #e8eef4;
+        --muted: #9aabbc;
+        --accent: #33b5e5;
+        --line: #2a3542;
+        --ok: #3dd68c;
+        --warn: #e8a838;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font: 16px/1.5 "Segoe UI", system-ui, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(900px 420px at 12% -10%, #1e3a4c 0%, transparent 55%),
+          var(--bg);
+      }
+      main {
+        max-width: 48rem;
+        margin: 0 auto;
+        padding: 2.5rem 1.25rem 3rem;
+      }
+      h1 {
+        margin: 0 0 0.35rem;
+        font-size: 1.85rem;
+        letter-spacing: -0.02em;
+      }
+      .tagline {
+        margin: 0 0 1.75rem;
+        color: var(--muted);
+      }
+      .nav {
+        margin-bottom: 1.25rem;
+        font-size: 0.95rem;
+      }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 1.1rem 1.2rem;
+        margin-bottom: 1rem;
+      }
+      h2 {
+        margin: 0 0 0.85rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr));
+        gap: 0.75rem;
+      }
+      .card {
+        background: #121820;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 0.85rem 0.9rem;
+      }
+      .card .n {
+        font-size: 1.55rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+      }
+      .card .l {
+        margin-top: 0.2rem;
+        color: var(--muted);
+        font-size: 0.8rem;
+      }
+      .ok {
+        color: var(--ok);
+      }
+      .warn {
+        color: var(--warn);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.92rem;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.45rem 0.35rem;
+        border-bottom: 1px solid var(--line);
+      }
+      th {
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      td.num,
+      th.num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .chart {
+        display: flex;
+        align-items: flex-end;
+        gap: 4px;
+        height: 140px;
+        margin-top: 0.35rem;
+      }
+      .bar-wrap {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        height: 100%;
+        justify-content: flex-end;
+        min-width: 0;
+      }
+      .bar {
+        width: 100%;
+        max-width: 28px;
+        background: var(--accent);
+        border-radius: 3px 3px 0 0;
+        min-height: 2px;
+      }
+      .bar-label {
+        margin-top: 0.35rem;
+        font-size: 0.65rem;
+        color: var(--muted);
+        transform: rotate(-45deg);
+        white-space: nowrap;
+        height: 1.6rem;
+      }
+      .types {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1rem;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+      .err {
+        color: #ff8e8e;
+      }
+      footer {
+        margin-top: 1.5rem;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="nav"><a href="/">← Waze Issues</a></p>
+      <h1>Stats</h1>
+      <p class="tagline" id="tagline">Loading live report counts…</p>
+
+      <section>
+        <h2>Overview</h2>
+        <div class="cards" id="cards"></div>
+      </section>
+
+      <section>
+        <h2>Reporters</h2>
+        <div id="reporters"></div>
+      </section>
+
+      <section>
+        <h2>Reports per day</h2>
+        <div class="chart" id="chart"></div>
+      </section>
+
+      <section>
+        <h2>By issue type</h2>
+        <div class="types" id="types"></div>
+      </section>
+
+      <footer>
+        Data from <code>GET /api/stats</code> ·
+        <a href="https://github.com/ixxvivxxi/waze-issues">source</a>
+      </footer>
+    </main>
+    <script>
+      function esc(s) {
+        return String(s)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function render(data) {
+        const t = data.totals;
+        document.getElementById("tagline").textContent =
+          t.reporters +
+          " reporters · " +
+          t.reports +
+          " reports · updated " +
+          new Date().toISOString().slice(0, 16).replace("T", " ") +
+          " UTC";
+
+        document.getElementById("cards").innerHTML = [
+          ["Reports", t.reports, ""],
+          ["Reporters", t.reporters, "ok"],
+          ["Done", t.done, "ok"],
+          ["Pending", t.pending, "warn"],
+          ["Dismissed", t.dismissed, ""],
+        ]
+          .map(
+            ([l, n, c]) =>
+              '<div class="card"><div class="n ' +
+              c +
+              '">' +
+              esc(n) +
+              '</div><div class="l">' +
+              esc(l) +
+              "</div></div>",
+          )
+          .join("");
+
+        const rows = data.reporters
+          .map(
+            (r) =>
+              "<tr><td>" +
+              esc(r.nick) +
+              '</td><td class="num">' +
+              esc(r.reports) +
+              '</td><td class="num">' +
+              esc(r.pending) +
+              '</td><td class="num">' +
+              esc(r.done) +
+              '</td><td class="num">' +
+              esc(r.dismissed) +
+              "</td><td>" +
+              esc(r.firstReport) +
+              "</td><td>" +
+              esc(r.lastReport) +
+              "</td></tr>",
+          )
+          .join("");
+        document.getElementById("reporters").innerHTML =
+          '<table><thead><tr><th>Nick</th><th class="num">All</th><th class="num">Pending</th><th class="num">Done</th><th class="num">Dismissed</th><th>First</th><th>Last</th></tr></thead><tbody>' +
+          rows +
+          "</tbody></table>";
+
+        const max = Math.max(1, ...data.byDay.map((d) => d.count));
+        document.getElementById("chart").innerHTML = data.byDay
+          .map((d) => {
+            const h = Math.max(2, Math.round((d.count / max) * 110));
+            const label = d.day.slice(5);
+            return (
+              '<div class="bar-wrap" title="' +
+              esc(d.day) +
+              ": " +
+              esc(d.count) +
+              '"><div class="bar" style="height:' +
+              h +
+              'px"></div><div class="bar-label">' +
+              esc(label) +
+              "</div></div>"
+            );
+          })
+          .join("");
+
+        const labels = {
+          speed_limit: "Speed limit",
+          speed_bump_add: "Bump +",
+          speed_bump_remove: "Bump −",
+          general: "General",
+        };
+        document.getElementById("types").innerHTML = Object.entries(
+          t.byIssueType,
+        )
+          .map(
+            ([k, v]) =>
+              "<span><strong>" +
+              esc(labels[k] || k) +
+              "</strong> " +
+              esc(v) +
+              "</span>",
+          )
+          .join("");
+      }
+
+      fetch("/api/stats")
+        .then((r) => {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then(render)
+        .catch((e) => {
+          document.getElementById("tagline").innerHTML =
+            '<span class="err">Failed to load stats: ' + esc(e.message) + "</span>";
+        });
+    </script>
+  </body>
+</html>
+`;

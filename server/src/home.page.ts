@@ -139,6 +139,7 @@ export const HOME_PAGE_HTML = `<!doctype html>
         <ul>
           <li><code>POST /api/reports</code> — create a report</li>
           <li><code>GET /api/reports/bbox</code> — list by map bounds</li>
+          <li><a href="/stats">Stats</a> — reporters &amp; counts (<code>GET /api/stats</code>)</li>
           <li><a href="/health">GET /health</a> — service health</li>
         </ul>
       </section>

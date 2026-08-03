@@ -170,4 +170,87 @@ export class ReportsService {
     if (!row) throw new NotFoundException('Report not found');
     return this.toDto(row);
   }
+
+  async stats(): Promise<{
+    totals: {
+      reports: number;
+      reporters: number;
+      pending: number;
+      done: number;
+      dismissed: number;
+      byIssueType: Record<string, number>;
+    };
+    reporters: Array<{
+      nick: string;
+      reports: number;
+      pending: number;
+      done: number;
+      dismissed: number;
+      firstReport: string;
+      lastReport: string;
+    }>;
+    byDay: Array<{ day: string; count: number }>;
+  }> {
+    const [totalsRow] = await this.repo.query(`
+      SELECT
+        COUNT(*)::int AS reports,
+        COUNT(DISTINCT reporter_nick)::int AS reporters,
+        COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+        COUNT(*) FILTER (WHERE status = 'done')::int AS done,
+        COUNT(*) FILTER (WHERE status = 'dismissed')::int AS dismissed,
+        COUNT(*) FILTER (WHERE issue_type = 'speed_limit')::int AS speed_limit,
+        COUNT(*) FILTER (WHERE issue_type = 'speed_bump_add')::int AS bump_add,
+        COUNT(*) FILTER (WHERE issue_type = 'speed_bump_remove')::int AS bump_remove,
+        COUNT(*) FILTER (WHERE issue_type = 'general')::int AS general
+      FROM map_reports
+    `);
+    const reporterRows: Array<Record<string, unknown>> = await this.repo.query(`
+      SELECT
+        reporter_nick AS nick,
+        COUNT(*)::int AS reports,
+        COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+        COUNT(*) FILTER (WHERE status = 'done')::int AS done,
+        COUNT(*) FILTER (WHERE status = 'dismissed')::int AS dismissed,
+        MIN(created_at)::date::text AS first_report,
+        MAX(created_at)::date::text AS last_report
+      FROM map_reports
+      GROUP BY reporter_nick
+      ORDER BY COUNT(*) DESC, reporter_nick ASC
+    `);
+    const dayRows: Array<Record<string, unknown>> = await this.repo.query(`
+      SELECT created_at::date::text AS day, COUNT(*)::int AS count
+      FROM map_reports
+      GROUP BY created_at::date
+      ORDER BY created_at::date ASC
+    `);
+
+    return {
+      totals: {
+        reports: Number(totalsRow.reports),
+        reporters: Number(totalsRow.reporters),
+        pending: Number(totalsRow.pending),
+        done: Number(totalsRow.done),
+        dismissed: Number(totalsRow.dismissed),
+        byIssueType: {
+          speed_limit: Number(totalsRow.speed_limit),
+          speed_bump_add: Number(totalsRow.bump_add),
+          speed_bump_remove: Number(totalsRow.bump_remove),
+          general: Number(totalsRow.general),
+        },
+      },
+      reporters: reporterRows.map((r) => ({
+        nick: String(r.nick),
+        reports: Number(r.reports),
+        pending: Number(r.pending),
+        done: Number(r.done),
+        dismissed: Number(r.dismissed),
+        firstReport: String(r.first_report),
+        lastReport: String(r.last_report),
+      })),
+      byDay: dayRows.map((r) => ({
+        day: String(r.day),
+        count: Number(r.count),
+      })),
+    };
+  }
 }
