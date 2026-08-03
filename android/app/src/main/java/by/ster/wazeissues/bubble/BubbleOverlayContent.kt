@@ -57,6 +57,7 @@ import by.ster.wazeissues.ui.LengthGesture
 import by.ster.wazeissues.ui.ReportController
 import kotlin.math.hypot
 import kotlin.math.roundToInt
+import kotlinx.coroutines.withTimeoutOrNull
 
 private val SpeedSignRed = Color(0xFFE30613)
 private val SpeedSignBg = Color(0xFFFFFFF8)
@@ -77,33 +78,73 @@ fun BubbleHubOverlay(
     hubDp: Float,
     onOpen: () -> Unit,
     onCollapse: () -> Unit,
+    onOpenApp: () -> Unit,
     onDrag: (Float, Float) -> Unit,
+    onDragEnd: () -> Unit = {},
 ) {
     @Suppress("UNUSED_PARAMETER")
     val unusedReports = reports
     val touchSlop = LocalViewConfiguration.current.touchSlop
+    val longPressTimeout = LocalViewConfiguration.current.longPressTimeoutMillis
     val expanded = phase != BubblePhase.Collapsed
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
-                .pointerInput(expanded) {
+                .pointerInput(expanded, touchSlop, longPressTimeout) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
-                        var dragged = false
-                        var total = 0.0
-                        drag(down.id) { change ->
-                            val dx = change.positionChange().x
-                            val dy = change.positionChange().y
-                            total += hypot(dx.toDouble(), dy.toDouble())
-                            if (total > touchSlop) {
-                                dragged = true
-                                onDrag(dx, dy)
+                        // Prefer drag: movement past slop cancels long-press and starts moving.
+                        // Stillness until timeout opens the full app.
+                        val dragStarted =
+                            withTimeoutOrNull(longPressTimeout) {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change =
+                                        event.changes.firstOrNull { it.id == down.id }
+                                            ?: return@withTimeoutOrNull false
+                                    if (!change.pressed) {
+                                        change.consume()
+                                        return@withTimeoutOrNull false
+                                    }
+                                    val distance = (change.position - down.position).getDistance()
+                                    if (distance > touchSlop) {
+                                        onDrag(
+                                            change.positionChange().x,
+                                            change.positionChange().y,
+                                        )
+                                        change.consume()
+                                        return@withTimeoutOrNull true
+                                    }
+                                    change.consume()
+                                }
                             }
-                            change.consume()
-                        }
-                        if (!dragged) {
-                            if (expanded) onCollapse() else onOpen()
+
+                        when (dragStarted) {
+                            null -> {
+                                // Held still past long-press timeout → open app.
+                                onOpenApp()
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change =
+                                        event.changes.firstOrNull { it.id == down.id } ?: break
+                                    change.consume()
+                                    if (!change.pressed) break
+                                }
+                            }
+                            true -> {
+                                drag(down.id) { change ->
+                                    onDrag(
+                                        change.positionChange().x,
+                                        change.positionChange().y,
+                                    )
+                                    change.consume()
+                                }
+                                onDragEnd()
+                            }
+                            false -> {
+                                if (expanded) onCollapse() else onOpen()
+                            }
                         }
                     }
                 },

@@ -86,6 +86,8 @@
     <string name="bubble_notification_title">Бульбашка активна</string>
     <string name="bubble_notification_text">Натисніть сповіщення, щоб відкрити застосунок</string>
     <string name="bubble_stop">Зупинити бульбашку</string>
+    <string name="bubble_start_by_default">Запускати бульбашку за замовчуванням</string>
+    <string name="bubble_launch_waze">Відкривати Waze з бульбашкою</string>
     <string name="bubble_expand_label">Бульбашка відкривається</string>
     <string name="bubble_expand_up">Вгору</string>
     <string name="bubble_expand_down">Вниз</string>

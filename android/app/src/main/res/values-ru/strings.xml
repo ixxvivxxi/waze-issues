@@ -86,6 +86,8 @@
     <string name="bubble_notification_title">Пузырь активен</string>
     <string name="bubble_notification_text">Нажмите уведомление, чтобы открыть приложение</string>
     <string name="bubble_stop">Остановить пузырь</string>
+    <string name="bubble_start_by_default">Запускать пузырь по умолчанию</string>
+    <string name="bubble_launch_waze">Открывать Waze с пузырём</string>
     <string name="bubble_expand_label">Пузырь открывается</string>
     <string name="bubble_expand_up">Вверх</string>
     <string name="bubble_expand_down">Вниз</string>

@@ -36,9 +36,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,7 +63,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import android.app.Activity
 import by.ster.wazeissues.AppLocales
@@ -124,9 +129,23 @@ fun AppRoot(vm: MainViewModel = viewModel()) {
 @Composable
 private fun MainScreen(state: UiState, vm: MainViewModel) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var showOverlayHelp by remember { mutableStateOf(false) }
     val nickShown =
         state.nick.ifBlank { stringResource(R.string.nick_placeholder) }
+    LaunchedEffect(lifecycleOwner, state.settingsReady, state.bubbleStartByDefault) {
+        if (!state.settingsReady || !state.bubbleStartByDefault) return@LaunchedEffect
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            if (BubbleLauncher.consumeSkipBubbleAuto()) return@repeatOnLifecycle
+            if (BubbleLauncher.canDrawOverlays(context)) {
+                if (BubbleLauncher.start(context)) {
+                    (context as? Activity)?.moveTaskToBack(true)
+                }
+            } else {
+                showOverlayHelp = true
+            }
+        }
+    }
     if (showOverlayHelp) {
         AlertDialog(
             onDismissRequest = { showOverlayHelp = false },
@@ -774,6 +793,36 @@ private fun SettingsScreen(state: UiState, vm: MainViewModel) {
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.bubble_start_by_default),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Switch(
+                checked = state.bubbleStartByDefault,
+                onCheckedChange = { vm.setBubbleStartByDefault(it) },
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(R.string.bubble_launch_waze),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Switch(
+                checked = state.bubbleLaunchWaze,
+                onCheckedChange = { vm.setBubbleLaunchWaze(it) },
+            )
+        }
         Text(
             stringResource(R.string.bubble_expand_label),
             style = MaterialTheme.typography.titleSmall,

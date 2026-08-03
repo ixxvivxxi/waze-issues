@@ -32,6 +32,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setBubbleExpand(direction: BubbleExpandDirection) =
         reports.setBubbleExpand(direction)
 
+    fun setBubbleStartByDefault(enabled: Boolean) =
+        reports.setBubbleStartByDefault(enabled)
+
+    fun setBubbleLaunchWaze(enabled: Boolean) =
+        reports.setBubbleLaunchWaze(enabled)
+
     fun saveSettings(nick: String, apiBase: String) = reports.saveSettings(nick, apiBase)
 
     fun openEdit(item: RecentItem) = reports.openEdit(item)

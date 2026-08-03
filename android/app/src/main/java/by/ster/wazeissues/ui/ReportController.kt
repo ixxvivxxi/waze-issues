@@ -109,6 +109,13 @@ data class UiState(
     val language: String = AppLocales.EN,
     /** Bubble menu expand direction (relative to hub). */
     val bubbleExpand: BubbleExpandDirection = BubbleExpandDirection.Up,
+    /** Last hub position in dp (null = default). */
+    val bubbleXDp: Float? = null,
+    val bubbleYDp: Float? = null,
+    /** When true, opening the app starts the bubble and backgrounds the activity. */
+    val bubbleStartByDefault: Boolean = false,
+    /** When true, starting the bubble also brings Waze to the foreground. */
+    val bubbleLaunchWaze: Boolean = false,
     /** Set when a newer APK is published on the server. */
     val updateAvailable: UpdateInfo? = null,
     val updateDownloading: Boolean = false,
@@ -155,15 +162,28 @@ class ReportController(private val app: Application) {
         }
         settingsJob =
             scope.launch {
-                combine(settings.nick, settings.apiBase, settings.bubbleExpand) { nick, base, expand ->
-                    Triple(nick, base, expand)
-                }.collect { (nick, base, expand) ->
+                combine(
+                    combine(settings.nick, settings.apiBase, settings.bubbleExpand) { nick, base, expand ->
+                        Triple(nick, base, expand)
+                    },
+                    combine(settings.bubbleXDp, settings.bubbleYDp) { x, y -> x to y },
+                    combine(settings.bubbleStartByDefault, settings.bubbleLaunchWaze) { a, b -> a to b },
+                ) { identity, pos, flags ->
+                    Triple(identity, pos, flags)
+                }.collect { (identity, pos, flags) ->
+                    val (nick, base, expand) = identity
+                    val (xDp, yDp) = pos
+                    val (startByDefault, launchWaze) = flags
                     val ready = nick.isNotBlank()
                     _state.update { s ->
                         s.copy(
                             nick = nick,
                             apiBase = base,
                             bubbleExpand = expand,
+                            bubbleXDp = xDp,
+                            bubbleYDp = yDp,
+                            bubbleStartByDefault = startByDefault,
+                            bubbleLaunchWaze = launchWaze,
                             settingsReady = ready,
                             settingsLoaded = true,
                             showSettings = if (!ready) true else s.showSettings,
@@ -332,6 +352,25 @@ class ReportController(private val app: Application) {
             settings.setBubbleExpand(direction)
             _state.update { it.copy(bubbleExpand = direction) }
         }
+    }
+
+    fun setBubbleStartByDefault(enabled: Boolean) {
+        scope.launch {
+            settings.setBubbleStartByDefault(enabled)
+            _state.update { it.copy(bubbleStartByDefault = enabled) }
+        }
+    }
+
+    fun setBubbleLaunchWaze(enabled: Boolean) {
+        scope.launch {
+            settings.setBubbleLaunchWaze(enabled)
+            _state.update { it.copy(bubbleLaunchWaze = enabled) }
+        }
+    }
+
+    fun saveBubblePosition(xDp: Float, yDp: Float) {
+        _state.update { it.copy(bubbleXDp = xDp, bubbleYDp = yDp) }
+        scope.launch { settings.setBubblePosition(xDp, yDp) }
     }
 
     fun saveSettings(nick: String, apiBase: String) {

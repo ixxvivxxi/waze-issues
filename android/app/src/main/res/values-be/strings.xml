@@ -86,6 +86,8 @@
     <string name="bubble_notification_title">Бурбалка актыўная</string>
     <string name="bubble_notification_text">Націсніце апавяшчэнне, каб адкрыць праграму</string>
     <string name="bubble_stop">Спыніць бурбалку</string>
+    <string name="bubble_start_by_default">Запускаць бурбалку па змаўчанні</string>
+    <string name="bubble_launch_waze">Адкрываць Waze з бурбалкай</string>
     <string name="bubble_expand_label">Бурбалка адкрываецца</string>
     <string name="bubble_expand_up">Уверх</string>
     <string name="bubble_expand_down">Уніз</string>

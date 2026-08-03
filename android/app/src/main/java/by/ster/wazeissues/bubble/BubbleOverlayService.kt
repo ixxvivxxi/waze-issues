@@ -21,6 +21,7 @@ import androidx.core.app.ServiceCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
@@ -30,6 +31,8 @@ import by.ster.wazeissues.MainActivity
 import by.ster.wazeissues.R
 import by.ster.wazeissues.WazeIssuesApp
 import by.ster.wazeissues.ui.ReportController
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * Hub lives in its own overlay window and never moves on expand — only the label
@@ -56,6 +59,8 @@ class BubbleOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner 
     private var speedParams: WindowManager.LayoutParams? = null
 
     private var phase by mutableStateOf(BubblePhase.Collapsed)
+    /** Preferred setting may flip at open/drag so the strip never covers the hub. */
+    private var effectiveExpand by mutableStateOf(BubbleExpandDirection.Up)
     private var acquired = false
 
     override fun onCreate() {
@@ -83,6 +88,7 @@ class BubbleOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        persistHubPosition()
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
@@ -159,15 +165,13 @@ class BubbleOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner 
     }
 
     private fun attachHub() {
-        val metrics = currentMetrics()
+        val metrics = currentMetrics(reports.state.value.bubbleExpand)
         val density = resources.displayMetrics.density
         val hubWindowDp = metrics.hubDp + 2 * metrics.shadowPadDp
         val hubPx = (hubWindowDp * density).toInt()
-        val params =
-            baseParams(hubPx, hubPx).apply {
-                x = (16 * density).toInt()
-                y = (120 * density).toInt()
-            }
+        effectiveExpand = reports.state.value.bubbleExpand
+        val params = baseParams(hubPx, hubPx)
+        applySavedHubPosition(params)
         hubParams = params
         val hubDp = metrics.hubDp
         val view =
@@ -184,12 +188,38 @@ class BubbleOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner 
                             }
                         },
                         onCollapse = { applyPhase(BubblePhase.Collapsed) },
+                        onOpenApp = { openFullApp() },
                         onDrag = { dx, dy -> dragHub(dx, dy) },
+                        onDragEnd = { persistHubPosition() },
                     )
                 }
             }
         hubView = view
         windowManager.addView(view, params)
+        // DataStore may still be loading when the service starts; re-apply once ready.
+        if (!reports.state.value.settingsLoaded) {
+            lifecycleScope.launch {
+                reports.state.first { it.settingsLoaded }
+                val p = hubParams ?: return@launch
+                val v = hubView ?: return@launch
+                applySavedHubPosition(p)
+                runCatching { windowManager.updateViewLayout(v, p) }
+            }
+        }
+    }
+
+    private fun applySavedHubPosition(params: WindowManager.LayoutParams) {
+        val density = resources.displayMetrics.density
+        val state = reports.state.value
+        params.x = ((state.bubbleXDp ?: DEFAULT_HUB_X_DP) * density).toInt()
+        params.y = ((state.bubbleYDp ?: DEFAULT_HUB_Y_DP) * density).toInt()
+        clampToScreen(params)
+    }
+
+    private fun persistHubPosition() {
+        val params = hubParams ?: return
+        val density = resources.displayMetrics.density.coerceAtLeast(0.5f)
+        reports.saveBubblePosition(params.x / density, params.y / density)
     }
 
     private fun detachAll() {
@@ -200,8 +230,8 @@ class BubbleOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner 
         hubParams = null
     }
 
-    private fun currentMetrics(): BubbleMetrics =
-        BubbleMetrics.from(resources, reports.state.value.bubbleExpand)
+    private fun currentMetrics(direction: BubbleExpandDirection = effectiveExpand): BubbleMetrics =
+        BubbleMetrics.from(resources, direction)
 
     private fun applyPhase(next: BubblePhase) {
         if (next == BubblePhase.Collapsed) {
@@ -230,8 +260,10 @@ class BubbleOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner 
 
     private fun showActions() {
         val hub = hubParams ?: return
-        val direction = reports.state.value.bubbleExpand
-        val metrics = currentMetrics()
+        val preferred = reports.state.value.bubbleExpand
+        val direction = resolveExpandDirection(hub, preferred)
+        effectiveExpand = direction
+        val metrics = currentMetrics(direction)
         val density = resources.displayMetrics.density
         val w = (metrics.actionsWidthDp * density).toInt().coerceAtLeast(1)
         val h = (metrics.actionsHeightDp * density).toInt().coerceAtLeast(1)
@@ -243,7 +275,10 @@ class BubbleOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner 
             existing.height = h
             existing.x = ax
             existing.y = ay
-            clampToScreen(existing)
+            // Resolved direction should already fit; clamp only as a last resort.
+            if (!actionsRectOnScreen(ax, ay, w, h)) {
+                clampToScreen(existing)
+            }
             windowManager.updateViewLayout(actionsView, existing)
             return
         }
@@ -252,7 +287,9 @@ class BubbleOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner 
                 x = ax
                 y = ay
             }
-        clampToScreen(params)
+        if (!actionsRectOnScreen(ax, ay, w, h)) {
+            clampToScreen(params)
+        }
         actionsParams = params
         val view =
             ComposeView(this).apply {
@@ -260,8 +297,8 @@ class BubbleOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner 
                 setContent {
                     BubbleActionsOverlay(
                         reports = reports,
-                        direction = reports.state.value.bubbleExpand,
-                        metrics = currentMetrics(),
+                        direction = effectiveExpand,
+                        metrics = currentMetrics(effectiveExpand),
                         onGeneral = {
                             reports.reportGeneral()
                             applyPhase(BubblePhase.Collapsed)
@@ -280,6 +317,102 @@ class BubbleOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner 
             }
         actionsView = view
         windowManager.addView(view, params)
+    }
+
+    /**
+     * Prefer the setting; if the strip would leave the screen (and then be clamped onto
+     * the hub), flip to the opposite side, then try the other axis by free space.
+     */
+    private fun resolveExpandDirection(
+        hub: WindowManager.LayoutParams,
+        preferred: BubbleExpandDirection,
+    ): BubbleExpandDirection {
+        val dm = resources.displayMetrics
+        val bounds = visualHub(hub)
+        val candidates =
+            buildList {
+                add(preferred)
+                add(preferred.opposite())
+                when (preferred) {
+                    BubbleExpandDirection.Up, BubbleExpandDirection.Down -> {
+                        val left = bounds[0]
+                        val right = dm.widthPixels - (bounds[0] + bounds[2])
+                        if (right >= left) {
+                            add(BubbleExpandDirection.Right)
+                            add(BubbleExpandDirection.Left)
+                        } else {
+                            add(BubbleExpandDirection.Left)
+                            add(BubbleExpandDirection.Right)
+                        }
+                    }
+                    BubbleExpandDirection.Left, BubbleExpandDirection.Right -> {
+                        val top = bounds[1]
+                        val bottom = dm.heightPixels - (bounds[1] + bounds[3])
+                        if (bottom >= top) {
+                            add(BubbleExpandDirection.Down)
+                            add(BubbleExpandDirection.Up)
+                        } else {
+                            add(BubbleExpandDirection.Up)
+                            add(BubbleExpandDirection.Down)
+                        }
+                    }
+                }
+            }.distinct()
+
+        return candidates.firstOrNull { directionFits(hub, it) }
+            ?: candidates.minBy { directionOverflow(hub, it) }
+    }
+
+    private fun BubbleExpandDirection.opposite(): BubbleExpandDirection =
+        when (this) {
+            BubbleExpandDirection.Up -> BubbleExpandDirection.Down
+            BubbleExpandDirection.Down -> BubbleExpandDirection.Up
+            BubbleExpandDirection.Left -> BubbleExpandDirection.Right
+            BubbleExpandDirection.Right -> BubbleExpandDirection.Left
+        }
+
+    private fun actionsPlacement(
+        hub: WindowManager.LayoutParams,
+        direction: BubbleExpandDirection,
+    ): IntArray {
+        val metrics = currentMetrics(direction)
+        val density = resources.displayMetrics.density
+        val w = (metrics.actionsWidthDp * density).toInt().coerceAtLeast(1)
+        val h = (metrics.actionsHeightDp * density).toInt().coerceAtLeast(1)
+        val gap = (metrics.gapDp * density).toInt()
+        val (ax, ay) = actionsOrigin(hub, direction, w, h, gap)
+        return intArrayOf(ax, ay, w, h)
+    }
+
+    private fun directionFits(
+        hub: WindowManager.LayoutParams,
+        direction: BubbleExpandDirection,
+    ): Boolean {
+        val p = actionsPlacement(hub, direction)
+        return actionsRectOnScreen(p[0], p[1], p[2], p[3])
+    }
+
+    private fun directionOverflow(
+        hub: WindowManager.LayoutParams,
+        direction: BubbleExpandDirection,
+    ): Int {
+        val p = actionsPlacement(hub, direction)
+        val ax = p[0]
+        val ay = p[1]
+        val w = p[2]
+        val h = p[3]
+        val dm = resources.displayMetrics
+        var overflow = 0
+        if (ax < 0) overflow += -ax
+        if (ay < 0) overflow += -ay
+        if (ax + w > dm.widthPixels) overflow += ax + w - dm.widthPixels
+        if (ay + h > dm.heightPixels) overflow += ay + h - dm.heightPixels
+        return overflow
+    }
+
+    private fun actionsRectOnScreen(ax: Int, ay: Int, w: Int, h: Int): Boolean {
+        val dm = resources.displayMetrics
+        return ax >= 0 && ay >= 0 && ax + w <= dm.widthPixels && ay + h <= dm.heightPixels
     }
 
     private fun removeActions() {
@@ -393,6 +526,7 @@ class BubbleOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner 
     }
 
     private fun openFullApp() {
+        BubbleLauncher.markSkipBubbleAuto()
         startActivity(
             Intent(this, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
@@ -403,6 +537,8 @@ class BubbleOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner 
     companion object {
         const val ACTION_STOP = "by.ster.wazeissues.STOP_BUBBLE"
         private const val NOTIF_ID = 43
+        private const val DEFAULT_HUB_X_DP = 16f
+        private const val DEFAULT_HUB_Y_DP = 120f
     }
 }
 

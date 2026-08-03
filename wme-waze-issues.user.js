@@ -3,7 +3,7 @@
 // @description     Show driving map reports from waze-issues.ster.by: speed-limit road signs and speed-bump markers; Done / Dismiss.
 // @namespace       https://github.com/ixxvivxxi/wme-scripts
 // @homepageURL     https://github.com/ixxvivxxi/waze-issues
-// @version         2026.07.28.001
+// @version         2026.08.03.001
 // @updateURL       https://raw.githubusercontent.com/ixxvivxxi/waze-issues/main/wme-waze-issues.user.js
 // @downloadURL     https://raw.githubusercontent.com/ixxvivxxi/waze-issues/main/wme-waze-issues.user.js
 // @match           https://www.waze.com/*/editor*
@@ -33,6 +33,8 @@
   const SCRIPT_INSTALL_URL =
     'https://raw.githubusercontent.com/ixxvivxxi/waze-issues/main/wme-waze-issues.user.js';
   const ICON_PX = 36;
+  /** Padded canvas so corner badges do not clip the sign. */
+  const ICON_PADDED_PX = 48;
   const MAX_BBOX_SPAN_DEG = 0.34;
   /** GPS accuracy disc — strong enough to see at street zoom. */
   const ACC_FILL = 'rgba(25, 118, 210, 0.38)';
@@ -61,6 +63,8 @@
   let pollTimer = null;
   /** @type {Record<string, string>} */
   const iconCache = Object.create(null);
+  /** @type {Record<string, HTMLCanvasElement>} */
+  const iconCanvasCache = Object.create(null);
   /** @type {any[]} */
   let lastReports = [];
 
@@ -173,10 +177,16 @@
     });
   }
 
+  function rememberIconCanvas(key, canvas) {
+    iconCanvasCache[key] = canvas;
+    iconCache[key] = canvas.toDataURL('image/png');
+    return canvas;
+  }
+
   /** Belarus / EU style circular speed-limit sign (3.24). */
-  function speedLimitEndSignDataUrl() {
+  function speedLimitEndSignCanvas() {
     const key = 'sl:end';
-    if (iconCache[key]) return iconCache[key];
+    if (iconCanvasCache[key]) return iconCanvasCache[key];
     const s = ICON_PX;
     const c = document.createElement('canvas');
     c.width = s;
@@ -203,14 +213,13 @@
     ctx.lineCap = 'round';
     ctx.stroke();
 
-    iconCache[key] = c.toDataURL('image/png');
-    return iconCache[key];
+    return rememberIconCanvas(key, c);
   }
 
-  function speedLimitSignDataUrl(kmh) {
-    if (kmh === 0 || kmh === '0') return speedLimitEndSignDataUrl();
+  function speedLimitSignCanvas(kmh) {
+    if (kmh === 0 || kmh === '0') return speedLimitEndSignCanvas();
     const key = 'sl:' + kmh;
-    if (iconCache[key]) return iconCache[key];
+    if (iconCanvasCache[key]) return iconCanvasCache[key];
     const s = ICON_PX;
     const c = document.createElement('canvas');
     c.width = s;
@@ -236,14 +245,13 @@
     ctx.font = 'bold ' + fontSize + 'px Arial, Helvetica, sans-serif';
     ctx.fillText(text, cx, cy + 1);
 
-    iconCache[key] = c.toDataURL('image/png');
-    return iconCache[key];
+    return rememberIconCanvas(key, c);
   }
 
   /** Speed bump add: yellow diamond warning-style. */
-  function bumpSignDataUrl(removed) {
+  function bumpSignCanvas(removed) {
     const key = removed ? 'bump:rm' : 'bump:add';
-    if (iconCache[key]) return iconCache[key];
+    if (iconCanvasCache[key]) return iconCanvasCache[key];
     const s = ICON_PX;
     const c = document.createElement('canvas');
     c.width = s;
@@ -284,14 +292,13 @@
       ctx.stroke();
     }
 
-    iconCache[key] = c.toDataURL('image/png');
-    return iconCache[key];
+    return rememberIconCanvas(key, c);
   }
 
   /** Generic map issue: orange circle with exclamation. */
-  function generalIssueDataUrl() {
+  function generalIssueCanvas() {
     const key = 'general';
-    if (iconCache[key]) return iconCache[key];
+    if (iconCanvasCache[key]) return iconCanvasCache[key];
     const s = ICON_PX;
     const c = document.createElement('canvas');
     c.width = s;
@@ -312,20 +319,129 @@
     ctx.textBaseline = 'middle';
     ctx.font = 'bold ' + s * 0.55 + 'px Arial, Helvetica, sans-serif';
     ctx.fillText('!', cx, cy + 1);
+    return rememberIconCanvas(key, c);
+  }
+
+  function reportHasComment(r) {
+    return !!(r && r.description && String(r.description).trim());
+  }
+
+  function reportLengthM(r) {
+    if (!r || r.issueType !== 'speed_limit') return 0;
+    const n = r.payload && r.payload.lengthM != null ? Number(r.payload.lengthM) : 0;
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+  }
+
+  function baseIconKey(r) {
+    if (r.issueType === 'speed_limit') {
+      const kmh = r.payload && r.payload.valueKmh != null ? Number(r.payload.valueKmh) : NaN;
+      if (kmh === 0) return 'sl:end';
+      return 'sl:' + (Number.isFinite(kmh) ? kmh : '?');
+    }
+    if (r.issueType === 'general') return 'general';
+    if (r.issueType === 'speed_bump_remove') return 'bump:rm';
+    if (r.issueType === 'speed_bump_add') return 'bump:add';
+    return 'general';
+  }
+
+  function baseIconCanvasForReport(r) {
+    if (r.issueType === 'speed_limit') {
+      const kmh = r.payload && r.payload.valueKmh != null ? Number(r.payload.valueKmh) : NaN;
+      if (kmh === 0) return speedLimitEndSignCanvas();
+      return speedLimitSignCanvas(Number.isFinite(kmh) ? kmh : '?');
+    }
+    if (r.issueType === 'general') return generalIssueCanvas();
+    if (r.issueType === 'speed_bump_remove') return bumpSignCanvas(true);
+    if (r.issueType === 'speed_bump_add') return bumpSignCanvas(false);
+    return generalIssueCanvas();
+  }
+
+  /** Draw comment / length badges onto a padded canvas around the base sign. */
+  function decorateIconDataUrl(baseCanvas, baseKey, hasComment, lengthM) {
+    const key =
+      'dec:' +
+      baseKey +
+      ':' +
+      (hasComment ? 'c' : '-') +
+      ':' +
+      (lengthM > 0 ? lengthM : 0);
+    if (iconCache[key]) return iconCache[key];
+
+    const pad = ICON_PADDED_PX;
+    const c = document.createElement('canvas');
+    c.width = pad;
+    c.height = pad;
+    const ctx = c.getContext('2d');
+    const ox = (pad - ICON_PX) / 2;
+    const oy = (pad - ICON_PX) / 2;
+    ctx.drawImage(baseCanvas, ox, oy, ICON_PX, ICON_PX);
+
+    if (hasComment) {
+      const br = 7;
+      const bx = pad - br - 1;
+      const by = br + 1;
+      ctx.beginPath();
+      ctx.arc(bx, by, br, 0, Math.PI * 2);
+      ctx.fillStyle = '#1565c0';
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.4;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(bx - 3.2, by - 2);
+      ctx.lineTo(bx + 3.2, by - 2);
+      ctx.moveTo(bx - 3.2, by + 0.6);
+      ctx.lineTo(bx + 1.5, by + 0.6);
+      ctx.moveTo(bx - 3.2, by + 3.2);
+      ctx.lineTo(bx + 2.5, by + 3.2);
+      ctx.stroke();
+    }
+
+    if (lengthM > 0) {
+      const label = String(lengthM) + 'm';
+      ctx.font = 'bold 9px Arial, Helvetica, sans-serif';
+      const tw = ctx.measureText(label).width;
+      const pw = Math.max(tw + 6, 18);
+      const ph = 12;
+      const px = pad - pw - 1;
+      const py = pad - ph - 1;
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#333333';
+      ctx.lineWidth = 1.2;
+      const rr = 2;
+      ctx.beginPath();
+      ctx.moveTo(px + rr, py);
+      ctx.lineTo(px + pw - rr, py);
+      ctx.quadraticCurveTo(px + pw, py, px + pw, py + rr);
+      ctx.lineTo(px + pw, py + ph - rr);
+      ctx.quadraticCurveTo(px + pw, py + ph, px + pw - rr, py + ph);
+      ctx.lineTo(px + rr, py + ph);
+      ctx.quadraticCurveTo(px, py + ph, px, py + ph - rr);
+      ctx.lineTo(px, py + rr);
+      ctx.quadraticCurveTo(px, py, px + rr, py);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#111111';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, px + pw / 2, py + ph / 2 + 0.5);
+    }
+
     iconCache[key] = c.toDataURL('image/png');
     return iconCache[key];
   }
 
   function iconForReport(r) {
-    if (r.issueType === 'speed_limit') {
-      const kmh = r.payload && r.payload.valueKmh != null ? Number(r.payload.valueKmh) : NaN;
-      if (kmh === 0) return speedLimitEndSignDataUrl();
-      return speedLimitSignDataUrl(Number.isFinite(kmh) ? kmh : '?');
-    }
-    if (r.issueType === 'general') return generalIssueDataUrl();
-    if (r.issueType === 'speed_bump_remove') return bumpSignDataUrl(true);
-    if (r.issueType === 'speed_bump_add') return bumpSignDataUrl(false);
-    return generalIssueDataUrl();
+    return decorateIconDataUrl(
+      baseIconCanvasForReport(r),
+      baseIconKey(r),
+      reportHasComment(r),
+      reportLengthM(r),
+    );
   }
 
   function labelForReport(r) {
@@ -333,9 +449,9 @@
       const kmh = r.payload && r.payload.valueKmh != null ? r.payload.valueKmh : '?';
       if (Number(kmh) === 0) return 'End of speed limit';
       let label = String(kmh) + ' km/h';
-      const lengthM = r.payload && r.payload.lengthM != null ? Number(r.payload.lengthM) : 0;
-      if (Number.isFinite(lengthM) && lengthM > 0) {
-        label += ' · ' + Math.round(lengthM) + ' m';
+      const lengthM = reportLengthM(r);
+      if (lengthM > 0) {
+        label += ' · ' + lengthM + ' m';
       }
       return label;
     }
@@ -527,10 +643,10 @@
 
       const style = new OpenLayers.Style({
         externalGraphic: '${iconUrl}',
-        graphicWidth: ICON_PX,
-        graphicHeight: ICON_PX,
-        graphicXOffset: -ICON_PX / 2,
-        graphicYOffset: -ICON_PX / 2,
+        graphicWidth: ICON_PADDED_PX,
+        graphicHeight: ICON_PADDED_PX,
+        graphicXOffset: -ICON_PADDED_PX / 2,
+        graphicYOffset: -ICON_PADDED_PX / 2,
         graphicTitle: '${title}',
         cursor: 'pointer',
       });
@@ -847,7 +963,9 @@
         ? '±' + Math.round(Number(accRaw)) + ' m'
         : '—';
     const when = r.createdAt ? new Date(r.createdAt).toLocaleString() : '';
-    popupEl.innerHTML =
+    const lengthM = reportLengthM(r);
+    const comment = reportHasComment(r) ? String(r.description).trim() : '';
+    let html =
       '<div style="font-weight:600;margin-bottom:6px">' +
       escapeHtml(labelForReport(r)) +
       '</div>' +
@@ -859,15 +977,27 @@
       '<br>heading ' +
       escapeHtml(heading) +
       ' · GPS ' +
-      escapeHtml(accuracy) +
+      escapeHtml(accuracy);
+    if (lengthM > 0) {
+      html += '<br>Length: <b>' + escapeHtml(String(lengthM)) + ' m</b>';
+    }
+    html +=
       '<br>' +
       Number(r.lat).toFixed(6) +
       ', ' +
       Number(r.lon).toFixed(6) +
-      (r.description
-        ? '<br><br>' + escapeHtml(r.description)
-        : '') +
       '</div>';
+    if (comment) {
+      html +=
+        '<div style="margin:0 0 10px;padding:8px 10px;background:#e3f2fd;' +
+        'border-left:4px solid #1565c0;border-radius:4px;color:#0d47a1">' +
+        '<div style="font-size:11px;font-weight:700;letter-spacing:.02em;margin-bottom:4px;' +
+        'text-transform:uppercase;opacity:.85">Comment</div>' +
+        '<div style="font-size:14px;line-height:1.4;color:#122;">' +
+        escapeHtml(comment) +
+        '</div></div>';
+    }
+    popupEl.innerHTML = html;
     const row = document.createElement('div');
     row.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap';
     const btnDone = document.createElement('button');
@@ -1101,7 +1231,9 @@
     const hint = document.createElement('div');
     hint.style.cssText = 'margin-top:10px;font-size:11px;color:#777';
     hint.textContent =
-      'Orange arrow = travel direction. Blue disc = GPS accuracy. Click a marker for Done / Dismiss.';
+      'Orange arrow = travel direction. Blue disc = GPS accuracy. ' +
+      'Blue badge on marker = comment. White Nm plate = length limit. ' +
+      'Click a marker for Done / Dismiss.';
     root.appendChild(hint);
 
     tabPane.appendChild(root);

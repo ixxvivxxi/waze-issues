@@ -86,6 +86,8 @@
     <string name="bubble_notification_title">Bubble reporter active</string>
     <string name="bubble_notification_text">Tap notification to open the app</string>
     <string name="bubble_stop">Stop bubble</string>
+    <string name="bubble_start_by_default">Start bubble by default</string>
+    <string name="bubble_launch_waze">Open Waze with bubble</string>
     <string name="bubble_expand_label">Bubble opens</string>
     <string name="bubble_expand_up">Up</string>
     <string name="bubble_expand_down">Down</string>

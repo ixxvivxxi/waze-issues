@@ -10,6 +10,23 @@ import by.ster.wazeissues.R
 import by.ster.wazeissues.WazeIssuesApp
 
 object BubbleLauncher {
+    /**
+     * Set before bringing [by.ster.wazeissues.MainActivity] to front from the bubble so
+     * “start bubble by default” does not immediately send the user back.
+     */
+    @Volatile
+    private var skipNextBubbleAuto = false
+
+    fun markSkipBubbleAuto() {
+        skipNextBubbleAuto = true
+    }
+
+    fun consumeSkipBubbleAuto(): Boolean {
+        val skip = skipNextBubbleAuto
+        skipNextBubbleAuto = false
+        return skip
+    }
+
     fun canDrawOverlays(context: Context): Boolean =
         Settings.canDrawOverlays(context)
 
@@ -52,10 +69,27 @@ object BubbleLauncher {
             return false
         }
         context.startForegroundService(Intent(context, BubbleOverlayService::class.java))
+        if (reports.state.value.bubbleLaunchWaze) {
+            openWaze(appCtx)
+        }
         return true
+    }
+
+    /** Brings Waze to the foreground when installed; no-op if missing. */
+    fun openWaze(context: Context) {
+        val launch =
+            context.packageManager.getLaunchIntentForPackage(WAZE_PACKAGE)?.apply {
+                addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED,
+                )
+            } ?: return
+        runCatching { context.startActivity(launch) }
     }
 
     fun stop(context: Context) {
         context.stopService(Intent(context, BubbleOverlayService::class.java))
     }
+
+    private const val WAZE_PACKAGE = "com.waze"
 }
