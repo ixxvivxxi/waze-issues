@@ -27,7 +27,6 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import by.ster.wazeissues.MainActivity
 import by.ster.wazeissues.R
 import by.ster.wazeissues.WazeIssuesApp
 import by.ster.wazeissues.ui.ReportController
@@ -115,7 +114,7 @@ class BubbleOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner 
             PendingIntent.getActivity(
                 this,
                 0,
-                Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                BubbleLauncher.intentOpenFullApp(this),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         val stop =
@@ -526,11 +525,7 @@ class BubbleOverlayService : Service(), LifecycleOwner, SavedStateRegistryOwner 
     }
 
     private fun openFullApp() {
-        BubbleLauncher.markSkipBubbleAuto()
-        startActivity(
-            Intent(this, MainActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
-        )
+        startActivity(BubbleLauncher.intentOpenFullApp(this))
         stopSelf()
     }
 

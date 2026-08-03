@@ -6,12 +6,15 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
+import by.ster.wazeissues.MainActivity
 import by.ster.wazeissues.R
 import by.ster.wazeissues.WazeIssuesApp
 
 object BubbleLauncher {
+    const val EXTRA_OPEN_FULL_APP = "by.ster.wazeissues.OPEN_FULL_APP"
+
     /**
-     * Set before bringing [by.ster.wazeissues.MainActivity] to front from the bubble so
+     * Set before bringing [MainActivity] to front from the bubble so
      * “start bubble by default” does not immediately send the user back.
      */
     @Volatile
@@ -25,6 +28,24 @@ object BubbleLauncher {
         val skip = skipNextBubbleAuto
         skipNextBubbleAuto = false
         return skip
+    }
+
+    /** Intent that opens the full app without immediately restarting the bubble. */
+    fun intentOpenFullApp(context: Context): Intent =
+        Intent(context, MainActivity::class.java)
+            .addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP,
+            )
+            .putExtra(EXTRA_OPEN_FULL_APP, true)
+
+    /** Call from MainActivity when handling a launcher / notification / bubble intent. */
+    fun applyOpenFullAppIntent(context: Context, intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_OPEN_FULL_APP, false) != true) return
+        markSkipBubbleAuto()
+        stop(context)
+        intent.removeExtra(EXTRA_OPEN_FULL_APP)
     }
 
     fun canDrawOverlays(context: Context): Boolean =

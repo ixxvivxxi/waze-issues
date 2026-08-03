@@ -1,6 +1,7 @@
 package by.ster.wazeissues
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -9,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import by.ster.wazeissues.bubble.BubbleLauncher
 import by.ster.wazeissues.ui.AppRoot
 
 class MainActivity : AppCompatActivity() {
@@ -17,12 +19,19 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        BubbleLauncher.applyOpenFullAppIntent(this, intent)
         // Keep screen awake while reporting in split-screen with Waze.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         requestNeededPermissions()
         setContent {
             AppRoot()
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        BubbleLauncher.applyOpenFullAppIntent(this, intent)
     }
 
     private fun requestNeededPermissions() {
